@@ -74,8 +74,6 @@ func TestRedisQueueDequeue(t *testing.T) {
 	jobDequeued, err := q.Dequeue(&DequeueOptions{
 		Prefix:    "prefix",
 		At:        job.CreatedAt,
-		LockedBy:  "test",
-		LockedAt:  job.CreatedAt,
 		LockedSec: 60,
 	})
 	require.NoError(t, err)
@@ -88,9 +86,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 	jobm, err := json.Marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"job":       string(jobm),
-		"locked_by": "test",
-		"locked_at": fmt.Sprint(job.CreatedAt.Unix()),
+		"job": string(jobm),
 	}, h)
 
 	z, err := client.ZRangeByScoreWithScores("prefix:queue",
@@ -104,10 +100,8 @@ func TestRedisQueueDequeue(t *testing.T) {
 
 	// empty
 	_, err = q.Dequeue(&DequeueOptions{
-		Prefix:   "prefix",
-		At:       job.CreatedAt,
-		LockedBy: "test",
-		LockedAt: job.CreatedAt,
+		Prefix: "prefix",
+		At:     job.CreatedAt,
 	})
 	require.Error(t, err)
 	require.Equal(t, "empty", err.Error())

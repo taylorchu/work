@@ -35,7 +35,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local queue_key = table.concat({opt.prefix, "queue"}, ":")
 
 	-- get job
-	local jobs = redis.call("zrangebyscore", queue_key, "-inf", opt.at, "LIMIT", 0, 1)
+	local jobs = redis.call("zrangebyscore", queue_key, "-inf", opt.at, "limit", 0, 1)
 	if table.getn(jobs) == 0 then
 		return redis.error_reply("empty")
 	end
@@ -49,15 +49,6 @@ func NewRedisQueue(client *redis.Client) Queue {
 	-- mark it as "processing" by increasing the score
 	redis.call("zincrby", queue_key, opt.locked_sec, job_id)
 
-	-- check whether this job is locked
-	if job.locked_by ~= nil and job.locked_at ~= nil and job.locked_by ~= opt.locked_by and tonumber(job.locked_at) > opt.locked_at + opt.locked_sec then
-		return redis.error_reply("locked")
-	end
-	redis.call("hmset", job_id, "locked_by", opt.locked_by, "locked_at", opt.locked_at)
-
-	for k, v in pairs(job) do
-		print(k, v)
-	end
 	return job.job
 	`)
 

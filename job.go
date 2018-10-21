@@ -70,8 +70,6 @@ type Enqueuer interface {
 type DequeueOptions struct {
 	Prefix    string `json:"prefix"`
 	At        Time   `json:"at"`
-	LockedBy  string `json:"locked_by"`
-	LockedAt  Time   `json:"locked_at"`
 	LockedSec int64  `json:"locked_sec"`
 }
 
