@@ -122,6 +122,8 @@ func TestRedisQueueAck(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
+
 	z, err := client.ZRangeByScoreWithScores("ns1:queue",
 		redis.ZRangeBy{
 			Min: fmt.Sprint(job.CreatedAt.Unix()),
@@ -129,6 +131,10 @@ func TestRedisQueueAck(t *testing.T) {
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 1)
+
+	e, err := client.Exists(jobKey).Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, e)
 
 	err = q.Ack(job, &DequeueOptions{Namespace: "ns1"})
 	require.NoError(t, err)
@@ -140,4 +146,8 @@ func TestRedisQueueAck(t *testing.T) {
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 0)
+
+	e, err = client.Exists(jobKey).Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 0, e)
 }
