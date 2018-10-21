@@ -25,12 +25,12 @@ func TestRedisQueueEnqueue(t *testing.T) {
 	require.NoError(t, err)
 
 	err = q.Enqueue(job, &EnqueueOptions{
-		Prefix: "prefix",
-		At:     job.CreatedAt,
+		Namespace: "ns1",
+		At:        job.CreatedAt,
 	})
 	require.NoError(t, err)
 
-	jobKey := fmt.Sprintf("prefix:job:%s", job.ID)
+	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
 
 	h, err := client.HGetAll(jobKey).Result()
 	require.NoError(t, err)
@@ -40,7 +40,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 		"job": string(jobm),
 	}, h)
 
-	z, err := client.ZRangeByScoreWithScores("prefix:queue",
+	z, err := client.ZRangeByScoreWithScores("ns1:queue",
 		redis.ZRangeBy{
 			Min: fmt.Sprint(job.CreatedAt.Unix()),
 			Max: fmt.Sprint(job.CreatedAt.Unix()),
@@ -66,20 +66,20 @@ func TestRedisQueueDequeue(t *testing.T) {
 	require.NoError(t, err)
 
 	err = q.Enqueue(job, &EnqueueOptions{
-		Prefix: "prefix",
-		At:     job.CreatedAt,
+		Namespace: "ns1",
+		At:        job.CreatedAt,
 	})
 	require.NoError(t, err)
 
 	jobDequeued, err := q.Dequeue(&DequeueOptions{
-		Prefix:    "prefix",
+		Namespace: "ns1",
 		At:        job.CreatedAt,
 		LockedSec: 60,
 	})
 	require.NoError(t, err)
 	require.Equal(t, job, jobDequeued)
 
-	jobKey := fmt.Sprintf("prefix:job:%s", job.ID)
+	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
 
 	h, err := client.HGetAll(jobKey).Result()
 	require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 		"job": string(jobm),
 	}, h)
 
-	z, err := client.ZRangeByScoreWithScores("prefix:queue",
+	z, err := client.ZRangeByScoreWithScores("ns1:queue",
 		redis.ZRangeBy{
 			Min: fmt.Sprint(job.CreatedAt.Unix() + 60),
 			Max: fmt.Sprint(job.CreatedAt.Unix() + 60),
@@ -100,8 +100,8 @@ func TestRedisQueueDequeue(t *testing.T) {
 
 	// empty
 	_, err = q.Dequeue(&DequeueOptions{
-		Prefix: "prefix",
-		At:     job.CreatedAt,
+		Namespace: "ns1",
+		At:        job.CreatedAt,
 	})
 	require.Error(t, err)
 	require.Equal(t, "empty", err.Error())
@@ -117,12 +117,12 @@ func TestRedisQueueAck(t *testing.T) {
 	job := NewJob()
 
 	err := q.Enqueue(job, &EnqueueOptions{
-		Prefix: "prefix",
-		At:     job.CreatedAt,
+		Namespace: "ns1",
+		At:        job.CreatedAt,
 	})
 	require.NoError(t, err)
 
-	z, err := client.ZRangeByScoreWithScores("prefix:queue",
+	z, err := client.ZRangeByScoreWithScores("ns1:queue",
 		redis.ZRangeBy{
 			Min: fmt.Sprint(job.CreatedAt.Unix()),
 			Max: fmt.Sprint(job.CreatedAt.Unix()),
@@ -130,10 +130,10 @@ func TestRedisQueueAck(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, z, 1)
 
-	err = q.Ack(job, &DequeueOptions{Prefix: "prefix"})
+	err = q.Ack(job, &DequeueOptions{Namespace: "ns1"})
 	require.NoError(t, err)
 
-	z, err = client.ZRangeByScoreWithScores("prefix:queue",
+	z, err = client.ZRangeByScoreWithScores("ns1:queue",
 		redis.ZRangeBy{
 			Min: fmt.Sprint(job.CreatedAt.Unix()),
 			Max: fmt.Sprint(job.CreatedAt.Unix()),

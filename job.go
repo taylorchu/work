@@ -59,8 +59,8 @@ func NewJob() *Job {
 }
 
 type EnqueueOptions struct {
-	Prefix string `json:"prefix"`
-	At     Time   `json:"at"`
+	Namespace string `json:"ns"`
+	At        Time   `json:"at"`
 }
 
 type Enqueuer interface {
@@ -68,7 +68,7 @@ type Enqueuer interface {
 }
 
 type DequeueOptions struct {
-	Prefix    string `json:"prefix"`
+	Namespace string `json:"ns"`
 	At        Time   `json:"at"`
 	LockedSec int64  `json:"locked_sec"`
 }
