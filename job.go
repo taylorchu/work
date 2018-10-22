@@ -3,43 +3,35 @@ package work
 import (
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 )
 
-type Time struct {
-	time.Time
-}
-
-func (t *Time) MarshalJSON() ([]byte, error) {
-	return json.Marshal(t.Unix())
-}
-
-func (t *Time) UnmarshalJSON(b []byte) error {
-	var ts int64
-	err := json.Unmarshal(b, &ts)
-	if err != nil {
-		return err
-	}
-	t.Time = time.Unix(ts, 0)
-	return nil
-}
-
+// Job is a single unit of work.
 type Job struct {
-	ID        string          `json:"id"`
-	CreatedAt Time            `json:"created_at"`
-	UpdatedAt Time            `json:"updated_at"`
-	Payload   json.RawMessage `json:"payload"`
+	// ID is the unique id of the job.
+	ID string `json:"id"`
+	// CreatedAt is set to the time when NewJob is called.
+	CreatedAt Time `json:"created_at"`
+	// UpdatedAt is when the job is last executed.
+	// UpdatedAt is set to the time when NewJob is called initially.
+	UpdatedAt Time `json:"updated_at"`
 
-	Retries   int64  `json:"retries"`
+	// payload is raw json bytes.
+	Payload json.RawMessage `json:"payload"`
+
+	// If the job previously fails, Retries will be incremented.
+	Retries int64 `json:"retries"`
+	// If the job previously fails, LastError will be populated with error string.
 	LastError string `json:"last_error"`
 }
 
+// UnmarshalPayload decodes the payload into a variable.
 func (j *Job) UnmarshalPayload(v interface{}) error {
 	return json.Unmarshal(j.Payload, v)
 }
 
+// MarshalPayload encodes a variable into the payload.
 func (j *Job) MarshalPayload(v interface{}) error {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -49,9 +41,10 @@ func (j *Job) MarshalPayload(v interface{}) error {
 	return nil
 }
 
+// NewJob creates a job.
 func NewJob() *Job {
 	id := uuid.New().String()
-	now := Time{time.Now().Truncate(time.Second)}
+	now := NewTime()
 	return &Job{
 		ID:        id,
 		CreatedAt: now,
@@ -59,19 +52,26 @@ func NewJob() *Job {
 	}
 }
 
+// options validation errors
 var (
 	ErrEmptyNamespace = errors.New("empty namespace")
 	ErrEmptyQueueID   = errors.New("empty queue id")
 	ErrAt             = errors.New("at should not be zero")
-	ErrLockedAt       = errors.New("locked at should be > 0")
+	ErrInvisibleSec   = errors.New("invisible sec should be > 0")
 )
 
+// EnqueueOptions specifies how a job is enqueued.
 type EnqueueOptions struct {
+	// Namespace is the namespace of the queue.
 	Namespace string `json:"ns"`
-	QueueID   string `json:"queue_id"`
-	At        Time   `json:"at"`
+	// QueueID is the id of the queue.
+	QueueID string `json:"queue_id"`
+	// At is the current time of the enqueuer.
+	// Use this to delay the job execution.
+	At Time `json:"at"`
 }
 
+// Validate validates EnqueueOptions.
 func (opt *EnqueueOptions) Validate() error {
 	if opt.Namespace == "" {
 		return ErrEmptyNamespace
@@ -85,17 +85,26 @@ func (opt *EnqueueOptions) Validate() error {
 	return nil
 }
 
+// Enqueuer enqueues a job.
 type Enqueuer interface {
 	Enqueue(*Job, *EnqueueOptions) error
 }
 
+// DequeueOptions specifies how a job is dequeued.
 type DequeueOptions struct {
+	// Namespace is the namespace of the queue.
 	Namespace string `json:"ns"`
-	QueueID   string `json:"queue_id"`
-	At        Time   `json:"at"`
-	LockedSec int64  `json:"locked_sec"`
+	// QueueID is the id of the queue.
+	QueueID string `json:"queue_id"`
+	// At is the current time of the dequeuer.
+	// Any job that is scheduled before this time can be executed.
+	At Time `json:"at"`
+	// After the job is dequeued, no other dequeuer can see this job for a while.
+	// InvisibleSec controls how long this period is.
+	InvisibleSec int64 `json:"invisible_sec"`
 }
 
+// Validate validates DequeueOptions.
 func (opt *DequeueOptions) Validate() error {
 	if opt.Namespace == "" {
 		return ErrEmptyNamespace
@@ -106,17 +115,19 @@ func (opt *DequeueOptions) Validate() error {
 	if opt.At.IsZero() {
 		return ErrAt
 	}
-	if opt.LockedSec <= 0 {
-		return ErrLockedAt
+	if opt.InvisibleSec <= 0 {
+		return ErrInvisibleSec
 	}
 	return nil
 }
 
+// AckOptions specifies how a job is deleted from a queue.
 type AckOptions struct {
 	Namespace string `json:"ns"`
 	QueueID   string `json:"queue_id"`
 }
 
+// Validate validates AckOptions.
 func (opt *AckOptions) Validate() error {
 	if opt.Namespace == "" {
 		return ErrEmptyNamespace
@@ -127,11 +138,14 @@ func (opt *AckOptions) Validate() error {
 	return nil
 }
 
+// Dequeuer dequeues a job.
+// If the job is processed successfully, call Ack() to delete the job from the queue.
 type Dequeuer interface {
 	Dequeue(*DequeueOptions) (*Job, error)
 	Ack(*Job, *AckOptions) error
 }
 
+// Queue can enqueue and dequeue jobs.
 type Queue interface {
 	Enqueuer
 	Dequeuer

@@ -14,6 +14,7 @@ type redisQueue struct {
 	ackScript     *redis.Script
 }
 
+// NewRedisQueue creates a new queue stored on redis.
 func NewRedisQueue(client *redis.Client) Queue {
 	enqueueScript := redis.NewScript(`
 	local opt = cjson.decode(ARGV[1])
@@ -47,7 +48,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	end
 
 	-- mark it as "processing" by increasing the score
-	redis.call("zincrby", queue_key, opt.locked_sec, job_id)
+	redis.call("zincrby", queue_key, opt.invisible_sec, job_id)
 
 	return job.job
 	`)

@@ -74,10 +74,10 @@ func TestRedisQueueDequeue(t *testing.T) {
 	require.NoError(t, err)
 
 	jobDequeued, err := q.Dequeue(&DequeueOptions{
-		Namespace: "ns1",
-		QueueID:   "q1",
-		At:        job.CreatedAt,
-		LockedSec: 60,
+		Namespace:    "ns1",
+		QueueID:      "q1",
+		At:           job.CreatedAt,
+		InvisibleSec: 60,
 	})
 	require.NoError(t, err)
 	require.Equal(t, job, jobDequeued)
@@ -103,10 +103,10 @@ func TestRedisQueueDequeue(t *testing.T) {
 
 	// empty
 	_, err = q.Dequeue(&DequeueOptions{
-		Namespace: "ns1",
-		QueueID:   "q1",
-		At:        job.CreatedAt,
-		LockedSec: 60,
+		Namespace:    "ns1",
+		QueueID:      "q1",
+		At:           job.CreatedAt,
+		InvisibleSec: 60,
 	})
 	require.Error(t, err)
 	require.Equal(t, "empty", err.Error())
