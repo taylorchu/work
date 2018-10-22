@@ -20,7 +20,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local job_id = ARGV[2]
 	local job = ARGV[3]
 	local job_key = table.concat({opt.ns, "job", job_id}, ":")
-	local queue_key = table.concat({opt.ns, "queue"}, ":")
+	local queue_key = table.concat({opt.ns, "queue", opt.queue_id}, ":")
 
 	-- update job fields
 	redis.call("hset", job_key, "job", job)
@@ -32,7 +32,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 
 	dequeueScript := redis.NewScript(`
 	local opt = cjson.decode(ARGV[1])
-	local queue_key = table.concat({opt.ns, "queue"}, ":")
+	local queue_key = table.concat({opt.ns, "queue", opt.queue_id}, ":")
 
 	-- get job
 	local jobs = redis.call("zrangebyscore", queue_key, "-inf", opt.at, "limit", 0, 1)
@@ -56,7 +56,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local opt = cjson.decode(ARGV[1])
 	local job_id = ARGV[2]
 	local job_key = table.concat({opt.ns, "job", job_id}, ":")
-	local queue_key = table.concat({opt.ns, "queue"}, ":")
+	local queue_key = table.concat({opt.ns, "queue", opt.queue_id}, ":")
 
 	-- delete job fields
 	redis.call("del", job_key)
@@ -75,6 +75,10 @@ func NewRedisQueue(client *redis.Client) Queue {
 }
 
 func (q *redisQueue) Enqueue(job *Job, opt *EnqueueOptions) error {
+	err := opt.Validate()
+	if err != nil {
+		return err
+	}
 	jobm, err := json.Marshal(job)
 	if err != nil {
 		return err
@@ -87,6 +91,10 @@ func (q *redisQueue) Enqueue(job *Job, opt *EnqueueOptions) error {
 }
 
 func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
+	err := opt.Validate()
+	if err != nil {
+		return nil, err
+	}
 	optm, err := json.Marshal(opt)
 	if err != nil {
 		return nil, err
@@ -103,7 +111,11 @@ func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
 	return &job, nil
 }
 
-func (q *redisQueue) Ack(job *Job, opt *DequeueOptions) error {
+func (q *redisQueue) Ack(job *Job, opt *AckOptions) error {
+	err := opt.Validate()
+	if err != nil {
+		return err
+	}
 	optm, err := json.Marshal(opt)
 	if err != nil {
 		return err

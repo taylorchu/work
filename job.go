@@ -2,6 +2,7 @@ package work
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -58,9 +59,30 @@ func NewJob() *Job {
 	}
 }
 
+var (
+	ErrEmptyNamespace = errors.New("empty namespace")
+	ErrEmptyQueueID   = errors.New("empty queue id")
+	ErrAt             = errors.New("at should not be zero")
+	ErrLockedAt       = errors.New("locked at should be > 0")
+)
+
 type EnqueueOptions struct {
 	Namespace string `json:"ns"`
+	QueueID   string `json:"queue_id"`
 	At        Time   `json:"at"`
+}
+
+func (opt *EnqueueOptions) Validate() error {
+	if opt.Namespace == "" {
+		return ErrEmptyNamespace
+	}
+	if opt.QueueID == "" {
+		return ErrEmptyQueueID
+	}
+	if opt.At.IsZero() {
+		return ErrAt
+	}
+	return nil
 }
 
 type Enqueuer interface {
@@ -69,13 +91,45 @@ type Enqueuer interface {
 
 type DequeueOptions struct {
 	Namespace string `json:"ns"`
+	QueueID   string `json:"queue_id"`
 	At        Time   `json:"at"`
 	LockedSec int64  `json:"locked_sec"`
 }
 
+func (opt *DequeueOptions) Validate() error {
+	if opt.Namespace == "" {
+		return ErrEmptyNamespace
+	}
+	if opt.QueueID == "" {
+		return ErrEmptyQueueID
+	}
+	if opt.At.IsZero() {
+		return ErrAt
+	}
+	if opt.LockedSec <= 0 {
+		return ErrLockedAt
+	}
+	return nil
+}
+
+type AckOptions struct {
+	Namespace string `json:"ns"`
+	QueueID   string `json:"queue_id"`
+}
+
+func (opt *AckOptions) Validate() error {
+	if opt.Namespace == "" {
+		return ErrEmptyNamespace
+	}
+	if opt.QueueID == "" {
+		return ErrEmptyQueueID
+	}
+	return nil
+}
+
 type Dequeuer interface {
 	Dequeue(*DequeueOptions) (*Job, error)
-	Ack(*Job, *DequeueOptions) error
+	Ack(*Job, *AckOptions) error
 }
 
 type Queue interface {
