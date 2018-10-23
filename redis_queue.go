@@ -24,7 +24,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local queue_key = table.concat({opt.ns, "queue", opt.queue_id}, ":")
 
 	-- update job fields
-	redis.call("hset", job_key, "job", job)
+	redis.call("hset", job_key, "json", job)
 
 	-- enqueue
 	redis.call("zadd", queue_key, opt.at, job_key)
@@ -50,7 +50,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	-- mark it as "processing" by increasing the score
 	redis.call("zincrby", queue_key, opt.invisible_sec, job_id)
 
-	return job.job
+	return job.json
 	`)
 
 	ackScript := redis.NewScript(`

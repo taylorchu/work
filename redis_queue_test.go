@@ -39,7 +39,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 	jobm, err := json.Marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"job": string(jobm),
+		"json": string(jobm),
 	}, h)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
@@ -106,7 +106,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 	jobm, err := json.Marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"job": string(jobm),
+		"json": string(jobm),
 	}, h)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",

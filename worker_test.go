@@ -62,7 +62,6 @@ func waitEmpty(client *redis.Client, key string, timeout time.Duration) error {
 			}
 		}
 	}
-	return nil
 }
 
 func TestWorkerRunJob(t *testing.T) {
