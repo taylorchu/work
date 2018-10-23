@@ -18,7 +18,6 @@ func TestWorkerStartStop(t *testing.T) {
 
 	w := NewWorker(&WorkerOptions{
 		Namespace: "ns1",
-		Client:    client,
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("test",
@@ -72,7 +71,6 @@ func TestWorkerRunJob(t *testing.T) {
 
 	w := NewWorker(&WorkerOptions{
 		Namespace: "ns1",
-		Client:    client,
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("success",

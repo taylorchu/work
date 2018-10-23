@@ -80,11 +80,11 @@ func (q *redisQueue) Enqueue(job *Job, opt *EnqueueOptions) error {
 	if err != nil {
 		return err
 	}
-	jobm, err := json.Marshal(job)
+	optm, err := json.Marshal(opt)
 	if err != nil {
 		return err
 	}
-	optm, err := json.Marshal(opt)
+	jobm, err := json.Marshal(job)
 	if err != nil {
 		return err
 	}

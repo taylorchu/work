@@ -20,7 +20,6 @@ type handler struct {
 
 // WorkerOptions is used to create a worker.
 type WorkerOptions struct {
-	Client    *redis.Client
 	Namespace string
 	Queue     Queue
 }
@@ -39,7 +38,6 @@ type Worker struct {
 // NewWorker creates a new worker.
 func NewWorker(opt *WorkerOptions) *Worker {
 	return &Worker{
-		client:     opt.Client,
 		namespace:  opt.Namespace,
 		queue:      opt.Queue,
 		handlerMap: make(map[string]handler),
