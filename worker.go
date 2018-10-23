@@ -149,7 +149,7 @@ func (w *Worker) Start() {
 							})
 						}()
 						if err != nil {
-							if err.Error() == "work: queue has no job" {
+							if err == ErrEmptyQueue {
 								time.Sleep(h.JobOptions.IdleWait)
 							} else {
 								log.Println(err)

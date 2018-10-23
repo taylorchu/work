@@ -139,6 +139,11 @@ func (opt *AckOptions) Validate() error {
 	return nil
 }
 
+var (
+	// ErrEmptyQueue is returned if Dequeue() is called on an empty queue.
+	ErrEmptyQueue = errors.New("work: no job is found")
+)
+
 // Dequeuer dequeues a job.
 // If a job is processed successfully, call Ack() to delete the job.
 type Dequeuer interface {

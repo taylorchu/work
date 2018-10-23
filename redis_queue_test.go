@@ -126,7 +126,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 		InvisibleSec: 60,
 	})
 	require.Error(t, err)
-	require.Equal(t, "work: queue has no job", err.Error())
+	require.Equal(t, ErrEmptyQueue, err)
 }
 
 func TestRedisQueueAck(t *testing.T) {

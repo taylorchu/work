@@ -38,7 +38,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	-- get job
 	local jobs = redis.call("zrangebyscore", queue_key, "-inf", opt.at, "limit", 0, 1)
 	if table.getn(jobs) == 0 then
-		return redis.error_reply("work: queue has no job")
+		return redis.error_reply("empty")
 	end
 	local job_id = jobs[1]
 	local resp = redis.call("hgetall", job_id)
@@ -102,6 +102,9 @@ func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
 	}
 	s, err := q.dequeueScript.Run(q.Client, nil, optm).String()
 	if err != nil {
+		if err.Error() == "empty" {
+			return nil, ErrEmptyQueue
+		}
 		return nil, err
 	}
 	var job Job
