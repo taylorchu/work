@@ -14,7 +14,7 @@ type redisQueue struct {
 	ackScript     *redis.Script
 }
 
-// NewRedisQueue creates a new queue stored on redis.
+// NewRedisQueue creates a new queue stored in redis.
 func NewRedisQueue(client *redis.Client) Queue {
 	enqueueScript := redis.NewScript(`
 	local opt = cjson.decode(ARGV[1])
@@ -38,7 +38,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	-- get job
 	local jobs = redis.call("zrangebyscore", queue_key, "-inf", opt.at, "limit", 0, 1)
 	if table.getn(jobs) == 0 then
-		return redis.error_reply("empty")
+		return redis.error_reply("work: queue has no job")
 	end
 	local job_id = jobs[1]
 	local resp = redis.call("hgetall", job_id)

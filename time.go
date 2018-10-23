@@ -10,9 +10,9 @@ type Time struct {
 	time.Time
 }
 
-// NewTime creates a new Time set to time.Now.
-func NewTime() Time {
-	return Time{time.Now().Truncate(time.Second)}
+// NewTime creates a new Time.
+func NewTime(t time.Time) Time {
+	return Time{t.Truncate(time.Second)}
 }
 
 // MarshalJSON marshals Time to unix timestamp.

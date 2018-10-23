@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/require"
@@ -45,6 +46,22 @@ func TestRedisQueueEnqueue(t *testing.T) {
 		redis.ZRangeBy{
 			Min: fmt.Sprint(job.CreatedAt.Unix()),
 			Max: fmt.Sprint(job.CreatedAt.Unix()),
+		}).Result()
+	require.NoError(t, err)
+	require.Len(t, z, 1)
+	require.Equal(t, jobKey, z[0].Member)
+
+	err = q.Enqueue(job, &EnqueueOptions{
+		Namespace: "ns1",
+		QueueID:   "q1",
+		At:        NewTime(job.CreatedAt.Add(60 * time.Second)),
+	})
+	require.NoError(t, err)
+
+	z, err = client.ZRangeByScoreWithScores("ns1:queue:q1",
+		redis.ZRangeBy{
+			Min: "-inf",
+			Max: "+inf",
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 1)
@@ -109,7 +126,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 		InvisibleSec: 60,
 	})
 	require.Error(t, err)
-	require.Equal(t, "empty", err.Error())
+	require.Equal(t, "work: queue has no job", err.Error())
 }
 
 func TestRedisQueueAck(t *testing.T) {
@@ -150,8 +167,8 @@ func TestRedisQueueAck(t *testing.T) {
 
 	z, err = client.ZRangeByScoreWithScores("ns1:queue:q1",
 		redis.ZRangeBy{
-			Min: fmt.Sprint(job.CreatedAt.Unix()),
-			Max: fmt.Sprint(job.CreatedAt.Unix()),
+			Min: "-inf",
+			Max: "+inf",
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 0)

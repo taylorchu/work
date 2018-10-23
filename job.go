@@ -3,21 +3,22 @@ package work
 import (
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 // Job is a single unit of work.
 type Job struct {
-	// ID is the unique id of the job.
+	// ID is the unique id of a job.
 	ID string `json:"id"`
-	// CreatedAt is set to the time when NewJob is called.
+	// CreatedAt is set to the time when NewJob() is called.
 	CreatedAt Time `json:"created_at"`
 	// UpdatedAt is when the job is last executed.
-	// UpdatedAt is set to the time when NewJob is called initially.
+	// UpdatedAt is set to the time when NewJob() is called initially.
 	UpdatedAt Time `json:"updated_at"`
 
-	// payload is raw json bytes.
+	// Payload is raw json bytes.
 	Payload json.RawMessage `json:"payload"`
 
 	// If the job previously fails, Retries will be incremented.
@@ -44,7 +45,7 @@ func (j *Job) MarshalPayload(v interface{}) error {
 // NewJob creates a job.
 func NewJob() *Job {
 	id := uuid.New().String()
-	now := NewTime()
+	now := NewTime(time.Now())
 	return &Job{
 		ID:        id,
 		CreatedAt: now,
@@ -54,20 +55,20 @@ func NewJob() *Job {
 
 // options validation errors
 var (
-	ErrEmptyNamespace = errors.New("empty namespace")
-	ErrEmptyQueueID   = errors.New("empty queue id")
-	ErrAt             = errors.New("at should not be zero")
-	ErrInvisibleSec   = errors.New("invisible sec should be > 0")
+	ErrEmptyNamespace = errors.New("work: empty namespace")
+	ErrEmptyQueueID   = errors.New("work: empty queue id")
+	ErrAt             = errors.New("work: at should not be zero")
+	ErrInvisibleSec   = errors.New("work: invisible sec should be > 0")
 )
 
 // EnqueueOptions specifies how a job is enqueued.
 type EnqueueOptions struct {
-	// Namespace is the namespace of the queue.
+	// Namespace is the namespace of a queue.
 	Namespace string `json:"ns"`
-	// QueueID is the id of the queue.
+	// QueueID is the id of a queue.
 	QueueID string `json:"queue_id"`
 	// At is the current time of the enqueuer.
-	// Use this to delay the job execution.
+	// Use this to delay job execution.
 	At Time `json:"at"`
 }
 
@@ -92,12 +93,12 @@ type Enqueuer interface {
 
 // DequeueOptions specifies how a job is dequeued.
 type DequeueOptions struct {
-	// Namespace is the namespace of the queue.
+	// Namespace is the namespace of a queue.
 	Namespace string `json:"ns"`
-	// QueueID is the id of the queue.
+	// QueueID is the id of a queue.
 	QueueID string `json:"queue_id"`
 	// At is the current time of the dequeuer.
-	// Any job that is scheduled before this time can be executed.
+	// Any job that is scheduled before this can be executed.
 	At Time `json:"at"`
 	// After the job is dequeued, no other dequeuer can see this job for a while.
 	// InvisibleSec controls how long this period is.
@@ -139,7 +140,7 @@ func (opt *AckOptions) Validate() error {
 }
 
 // Dequeuer dequeues a job.
-// If the job is processed successfully, call Ack() to delete the job from the queue.
+// If a job is processed successfully, call Ack() to delete the job.
 type Dequeuer interface {
 	Dequeue(*DequeueOptions) (*Job, error)
 	Ack(*Job, *AckOptions) error
