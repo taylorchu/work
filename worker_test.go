@@ -11,9 +11,8 @@ import (
 )
 
 func TestWorkerStartStop(t *testing.T) {
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-	})
+	client := newRedisClient()
+	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 
 	w := NewWorker(&WorkerOptions{
@@ -64,9 +63,8 @@ func waitEmpty(client *redis.Client, key string, timeout time.Duration) error {
 }
 
 func TestWorkerRunJob(t *testing.T) {
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-	})
+	client := newRedisClient()
+	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 
 	w := NewWorker(&WorkerOptions{

@@ -10,10 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRedisQueueEnqueue(t *testing.T) {
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
+func newRedisClient() *redis.Client {
+	return redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:6379",
+		PoolSize:     10,
+		MinIdleConns: 10,
 	})
+}
+
+func TestRedisQueueEnqueue(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewRedisQueue(client)
 
@@ -69,9 +76,8 @@ func TestRedisQueueEnqueue(t *testing.T) {
 }
 
 func TestRedisQueueDequeue(t *testing.T) {
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-	})
+	client := newRedisClient()
+	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewRedisQueue(client)
 
@@ -130,9 +136,8 @@ func TestRedisQueueDequeue(t *testing.T) {
 }
 
 func TestRedisQueueAck(t *testing.T) {
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-	})
+	client := newRedisClient()
+	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewRedisQueue(client)
 
