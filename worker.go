@@ -2,13 +2,27 @@ package work
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 )
 
+// DequeueFunc generates a job.
+type DequeueFunc func(*DequeueOptions) (*Job, error)
+
+// DequeueMiddleware modifies DequeueFunc behavior.
+type DequeueMiddleware func(DequeueFunc) DequeueFunc
+
+// EnqueueFunc takes in a job for processing.
+type EnqueueFunc func(*Job, *EnqueueOptions) error
+
+// EnqueueMiddleware modifies EnqueueFunc behavior.
+type EnqueueMiddleware func(EnqueueFunc) EnqueueFunc
+
 // HandleFunc runs a job.
-type HandleFunc func(*Job) error
+type HandleFunc func(*Job, *DequeueOptions) error
+
+// HandleMiddleware modifies HandleFunc hehavior.
+type HandleMiddleware func(HandleFunc) HandleFunc
 
 type handler struct {
 	QueueID    string
@@ -46,6 +60,10 @@ type JobOptions struct {
 	MaxExecutionTime time.Duration
 	IdleWait         time.Duration
 	NumGoroutines    int64
+
+	DequeueMiddleware []DequeueMiddleware
+	EnqueueMiddleware []EnqueueMiddleware
+	HandleMiddleware  []HandleMiddleware
 }
 
 // options validation error
@@ -77,14 +95,18 @@ var (
 
 // Enqueue enqueues a job.
 func (w *Worker) Enqueue(queueID string, job *Job) error {
-	_, ok := w.handlerMap[queueID]
+	h, ok := w.handlerMap[queueID]
 	if !ok {
 		return ErrQueueNotFound
 	}
-	return w.queue.Enqueue(job, &EnqueueOptions{
+	enqueue := w.queue.Enqueue
+	for _, mw := range h.JobOptions.EnqueueMiddleware {
+		enqueue = mw(enqueue)
+	}
+	return enqueue(job, &EnqueueOptions{
 		Namespace: w.namespace,
 		QueueID:   queueID,
-		At:        NewTime(time.Now()),
+		At:        job.CreatedAt,
 	})
 }
 
@@ -111,45 +133,71 @@ func (w *Worker) Start() {
 			go func(h handler) {
 				defer w.wg.Done()
 
+				dequeue := w.queue.Dequeue
+				for _, mw := range h.JobOptions.DequeueMiddleware {
+					dequeue = mw(dequeue)
+				}
+				// add idleWait middleware
+				idleWait := func(f DequeueFunc) DequeueFunc {
+					return func(opt *DequeueOptions) (*Job, error) {
+						job, err := f(opt)
+						if err != nil {
+							if err == ErrEmptyQueue {
+								time.Sleep(h.JobOptions.IdleWait)
+							}
+							return nil, err
+						}
+						return job, nil
+					}
+				}
+				dequeue = idleWait(dequeue)
+
+				handle := h.HandleFunc
+				for _, mw := range h.JobOptions.HandleMiddleware {
+					handle = mw(handle)
+				}
+				// add retry middleware
+				retry := func(f HandleFunc) HandleFunc {
+					return func(job *Job, opt *DequeueOptions) error {
+						err := f(job, opt)
+						if err != nil {
+							now := time.Now()
+							job.Retries++
+							job.LastError = err.Error()
+							job.UpdatedAt = NewTime(now)
+							w.queue.Enqueue(job, &EnqueueOptions{
+								Namespace: w.namespace,
+								QueueID:   h.QueueID,
+								At:        NewTime(now.Add(2 * h.JobOptions.MaxExecutionTime)),
+							})
+							return err
+						}
+						return w.queue.Ack(job, &AckOptions{
+							Namespace: w.namespace,
+							QueueID:   h.QueueID,
+						})
+					}
+				}
+				handle = retry(handle)
+
 				for {
 					select {
 					case <-stop:
 						return
 					default:
-						err := func() error {
-							job, err := w.queue.Dequeue(&DequeueOptions{
+						func() error {
+							opt := &DequeueOptions{
 								Namespace:    w.namespace,
 								QueueID:      h.QueueID,
 								At:           NewTime(time.Now()),
 								InvisibleSec: int64(2 * h.JobOptions.MaxExecutionTime / time.Second),
-							})
+							}
+							job, err := dequeue(opt)
 							if err != nil {
 								return err
 							}
-							err = h.HandleFunc(job)
-							if err != nil {
-								now := time.Now()
-								job.Retries++
-								job.LastError = err.Error()
-								job.UpdatedAt = NewTime(now)
-								return w.queue.Enqueue(job, &EnqueueOptions{
-									Namespace: w.namespace,
-									QueueID:   h.QueueID,
-									At:        NewTime(now.Add(2 * h.JobOptions.MaxExecutionTime)),
-								})
-							}
-							return w.queue.Ack(job, &AckOptions{
-								Namespace: w.namespace,
-								QueueID:   h.QueueID,
-							})
+							return handle(job, opt)
 						}()
-						if err != nil {
-							if err == ErrEmptyQueue {
-								time.Sleep(h.JobOptions.IdleWait)
-							} else {
-								log.Println(err)
-							}
-						}
 					}
 				}
 			}(h)

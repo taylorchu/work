@@ -66,7 +66,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 				})
 				var wg sync.WaitGroup
 				err := w.Register("test",
-					func(*Job) error {
+					func(*Job, *DequeueOptions) error {
 						wg.Done()
 						return nil
 					},

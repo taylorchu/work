@@ -20,7 +20,7 @@ func TestWorkerStartStop(t *testing.T) {
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("test",
-		func(*Job) error { return nil },
+		func(*Job, *DequeueOptions) error { return nil },
 		&JobOptions{
 			MaxExecutionTime: time.Second,
 			IdleWait:         time.Second,
@@ -76,7 +76,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("test1",
-		func(job *Job) error {
+		func(job *Job, _ *DequeueOptions) error {
 			var msg message
 			job.UnmarshalPayload(&msg)
 			if msg.Text != "test1" {
@@ -92,7 +92,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 	)
 	require.NoError(t, err)
 	err = w.Register("test2",
-		func(job *Job) error {
+		func(job *Job, _ *DequeueOptions) error {
 			var msg message
 			job.UnmarshalPayload(&msg)
 			if msg.Text != "test2" {
@@ -160,7 +160,7 @@ func TestWorkerRunJob(t *testing.T) {
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("success",
-		func(*Job) error { return nil },
+		func(*Job, *DequeueOptions) error { return nil },
 		&JobOptions{
 			MaxExecutionTime: 60 * time.Second,
 			IdleWait:         time.Second,
@@ -169,7 +169,7 @@ func TestWorkerRunJob(t *testing.T) {
 	)
 	require.NoError(t, err)
 	err = w.Register("failure",
-		func(*Job) error { return errors.New("no reason") },
+		func(*Job, *DequeueOptions) error { return errors.New("no reason") },
 		&JobOptions{
 			MaxExecutionTime: 60 * time.Second,
 			IdleWait:         time.Second,
