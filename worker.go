@@ -5,8 +5,6 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"github.com/go-redis/redis"
 )
 
 // HandleFunc runs a job.
@@ -26,7 +24,6 @@ type WorkerOptions struct {
 
 // Worker runs jobs.
 type Worker struct {
-	client    *redis.Client
 	namespace string
 	queue     Queue
 

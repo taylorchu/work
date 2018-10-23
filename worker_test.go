@@ -29,7 +29,7 @@ func TestWorkerStartStop(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 3; i++ {
 		w.Start()
 		w.Stop()
 	}
@@ -60,6 +60,94 @@ func waitEmpty(client *redis.Client, key string, timeout time.Duration) error {
 			}
 		}
 	}
+}
+
+func TestWorkerRunJobMultiQueue(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(t, client.FlushAll().Err())
+
+	type message struct {
+		Text string
+	}
+
+	w := NewWorker(&WorkerOptions{
+		Namespace: "ns1",
+		Queue:     NewRedisQueue(client),
+	})
+	err := w.Register("test1",
+		func(job *Job) error {
+			var msg message
+			job.UnmarshalPayload(&msg)
+			if msg.Text != "test1" {
+				return errors.New("bad payload")
+			}
+			return nil
+		},
+		&JobOptions{
+			MaxExecutionTime: 60 * time.Second,
+			IdleWait:         time.Second,
+			NumGoroutines:    2,
+		},
+	)
+	require.NoError(t, err)
+	err = w.Register("test2",
+		func(job *Job) error {
+			var msg message
+			job.UnmarshalPayload(&msg)
+			if msg.Text != "test2" {
+				return errors.New("bad payload")
+			}
+			return nil
+		},
+		&JobOptions{
+			MaxExecutionTime: 60 * time.Second,
+			IdleWait:         time.Second,
+			NumGoroutines:    2,
+		},
+	)
+	require.NoError(t, err)
+
+	for i := 0; i < 3; i++ {
+		job := NewJob()
+		err := job.MarshalPayload(message{Text: "test1"})
+		require.NoError(t, err)
+
+		err = w.Enqueue("test1", job)
+		require.NoError(t, err)
+	}
+
+	for i := 0; i < 3; i++ {
+		job := NewJob()
+		err := job.MarshalPayload(message{Text: "test2"})
+		require.NoError(t, err)
+
+		err = w.Enqueue("test2", job)
+		require.NoError(t, err)
+	}
+
+	count, err := client.ZCard("ns1:queue:test1").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, count)
+
+	count, err = client.ZCard("ns1:queue:test2").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, count)
+
+	w.Start()
+	err = waitEmpty(client, "ns1:queue:test1", 10*time.Second)
+	require.NoError(t, err)
+	err = waitEmpty(client, "ns1:queue:test2", 10*time.Second)
+	require.NoError(t, err)
+	w.Stop()
+
+	count, err = client.ZCard("ns1:queue:test1").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 0, count)
+
+	count, err = client.ZCard("ns1:queue:test2").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 0, count)
 }
 
 func TestWorkerRunJob(t *testing.T) {
@@ -102,12 +190,16 @@ func TestWorkerRunJob(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	count, err := client.ZCard("ns1:queue:success").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, count)
+
 	w.Start()
 	err = waitEmpty(client, "ns1:queue:success", 10*time.Second)
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err := client.ZCard("ns1:queue:success").Result()
+	count, err = client.ZCard("ns1:queue:success").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, count)
 
@@ -119,6 +211,10 @@ func TestWorkerRunJob(t *testing.T) {
 		err = w.Enqueue("failure", job)
 		require.NoError(t, err)
 	}
+
+	count, err = client.ZCard("ns1:queue:failure").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, count)
 
 	w.Start()
 	err = waitEmpty(client, "ns1:queue:failure", 10*time.Second)
