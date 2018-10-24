@@ -85,7 +85,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 			return nil
 		},
 		&JobOptions{
-			MaxExecutionTime: 60 * time.Second,
+			MaxExecutionTime: time.Minute,
 			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
@@ -101,7 +101,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 			return nil
 		},
 		&JobOptions{
-			MaxExecutionTime: 60 * time.Second,
+			MaxExecutionTime: time.Minute,
 			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
@@ -162,7 +162,7 @@ func TestWorkerRunJob(t *testing.T) {
 	err := w.Register("success",
 		func(*Job, *DequeueOptions) error { return nil },
 		&JobOptions{
-			MaxExecutionTime: 60 * time.Second,
+			MaxExecutionTime: time.Minute,
 			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
@@ -171,7 +171,18 @@ func TestWorkerRunJob(t *testing.T) {
 	err = w.Register("failure",
 		func(*Job, *DequeueOptions) error { return errors.New("no reason") },
 		&JobOptions{
-			MaxExecutionTime: 60 * time.Second,
+			MaxExecutionTime: time.Minute,
+			IdleWait:         time.Second,
+			NumGoroutines:    2,
+		},
+	)
+	require.NoError(t, err)
+	err = w.Register("panic",
+		func(*Job, *DequeueOptions) error {
+			panic("unexpected")
+		},
+		&JobOptions{
+			MaxExecutionTime: time.Minute,
 			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
@@ -235,5 +246,39 @@ func TestWorkerRunJob(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, 1, job.Retries)
 		require.Equal(t, "no reason", job.LastError)
+	}
+
+	for i := 0; i < 3; i++ {
+		job := NewJob()
+		err := job.MarshalPayload(message{Text: "hello"})
+		require.NoError(t, err)
+
+		err = w.Enqueue("panic", job)
+		require.NoError(t, err)
+	}
+
+	count, err = client.ZCard("ns1:queue:panic").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, count)
+
+	w.Start()
+	err = waitEmpty(client, "ns1:queue:panic", 10*time.Second)
+	require.NoError(t, err)
+	w.Stop()
+
+	count, err = client.ZCard("ns1:queue:panic").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 3, count)
+
+	for i := 0; i < 3; i++ {
+		job, err := NewRedisQueue(client).Dequeue(&DequeueOptions{
+			Namespace:    "ns1",
+			QueueID:      "panic",
+			At:           NewTime(time.Now().Add(time.Hour)),
+			InvisibleSec: 3600,
+		})
+		require.NoError(t, err)
+		require.EqualValues(t, 1, job.Retries)
+		require.Equal(t, "unexpected", job.LastError)
 	}
 }

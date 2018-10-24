@@ -2,9 +2,18 @@ package work
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestJobDelay(t *testing.T) {
+	job := NewJob()
+	job2 := job.Delay(time.Hour)
+
+	require.Equal(t, time.Hour, job2.CreatedAt.Sub(job.CreatedAt.Time))
+	require.Equal(t, time.Hour, job2.UpdatedAt.Sub(job.UpdatedAt.Time))
+}
 
 func TestJobMarshal(t *testing.T) {
 	job := NewJob()

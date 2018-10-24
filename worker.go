@@ -2,6 +2,7 @@ package work
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -91,6 +92,10 @@ var (
 	// ErrQueueNotFound is returned if the queue is not yet
 	// defined with Register().
 	ErrQueueNotFound = errors.New("work: queue is not found")
+
+	// ErrUnrecoverable is returned if the error is unrecoverable.
+	// The job will be discarded.
+	ErrUnrecoverable = errors.New("work: permanent error")
 )
 
 // Enqueue enqueues a job.
@@ -156,11 +161,13 @@ func (w *Worker) Start() {
 				for _, mw := range h.JobOptions.HandleMiddleware {
 					handle = mw(handle)
 				}
+				// add catchPanic middleware
+				handle = catchPanic(handle)
 				// add retry middleware
 				retry := func(f HandleFunc) HandleFunc {
 					return func(job *Job, opt *DequeueOptions) error {
 						err := f(job, opt)
-						if err != nil {
+						if err != nil && err != ErrUnrecoverable {
 							now := time.Now()
 							job.Retries++
 							job.LastError = err.Error()
@@ -168,7 +175,7 @@ func (w *Worker) Start() {
 							w.queue.Enqueue(job, &EnqueueOptions{
 								Namespace: w.namespace,
 								QueueID:   h.QueueID,
-								At:        NewTime(now.Add(2 * h.JobOptions.MaxExecutionTime)),
+								At:        NewTime(now.Add(time.Duration(job.Retries) * 2 * h.JobOptions.MaxExecutionTime)),
 							})
 							return err
 						}
@@ -210,4 +217,15 @@ func (w *Worker) Start() {
 func (w *Worker) Stop() {
 	close(w.stop)
 	w.wg.Wait()
+}
+
+func catchPanic(f HandleFunc) HandleFunc {
+	return func(job *Job, opt *DequeueOptions) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = errors.New(fmt.Sprint(r))
+			}
+		}()
+		return f(job, opt)
+	}
 }

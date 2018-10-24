@@ -7,7 +7,7 @@ import (
 )
 
 type redisQueue struct {
-	Client *redis.Client
+	client *redis.Client
 
 	enqueueScript *redis.Script
 	dequeueScript *redis.Script
@@ -68,7 +68,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 	`)
 
 	return &redisQueue{
-		Client:        client,
+		client:        client,
 		enqueueScript: enqueueScript,
 		dequeueScript: dequeueScript,
 		ackScript:     ackScript,
@@ -88,7 +88,7 @@ func (q *redisQueue) Enqueue(job *Job, opt *EnqueueOptions) error {
 	if err != nil {
 		return err
 	}
-	return q.enqueueScript.Run(q.Client, nil, optm, job.ID, jobm).Err()
+	return q.enqueueScript.Run(q.client, nil, optm, job.ID, jobm).Err()
 }
 
 func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
@@ -100,7 +100,7 @@ func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	s, err := q.dequeueScript.Run(q.Client, nil, optm).String()
+	s, err := q.dequeueScript.Run(q.client, nil, optm).String()
 	if err != nil {
 		if err.Error() == "empty" {
 			return nil, ErrEmptyQueue
@@ -124,5 +124,5 @@ func (q *redisQueue) Ack(job *Job, opt *AckOptions) error {
 	if err != nil {
 		return err
 	}
-	return q.ackScript.Run(q.Client, nil, optm, job.ID).Err()
+	return q.ackScript.Run(q.client, nil, optm, job.ID).Err()
 }

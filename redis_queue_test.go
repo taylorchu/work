@@ -61,7 +61,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 	err = q.Enqueue(job, &EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "q1",
-		At:        NewTime(job.CreatedAt.Add(60 * time.Second)),
+		At:        NewTime(job.CreatedAt.Add(time.Minute)),
 	})
 	require.NoError(t, err)
 

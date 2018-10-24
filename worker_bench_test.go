@@ -71,7 +71,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 						return nil
 					},
 					&JobOptions{
-						MaxExecutionTime: 60 * time.Second,
+						MaxExecutionTime: time.Minute,
 						IdleWait:         10 * time.Millisecond,
 						NumGoroutines:    1,
 					},

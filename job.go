@@ -53,6 +53,13 @@ func NewJob() *Job {
 	}
 }
 
+// Delay creates a job that can be executed in future.
+func (j Job) Delay(d time.Duration) *Job {
+	j.CreatedAt = NewTime(j.CreatedAt.Time.Add(d))
+	j.UpdatedAt = j.CreatedAt
+	return &j
+}
+
 // options validation errors
 var (
 	ErrEmptyNamespace = errors.New("work: empty namespace")
