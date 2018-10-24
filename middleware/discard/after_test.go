@@ -1,4 +1,4 @@
-package middleware
+package discard
 
 import (
 	"errors"
@@ -9,14 +9,14 @@ import (
 	"github.com/taylorchu/work"
 )
 
-func TestDiscardAfter(t *testing.T) {
+func TestAfter(t *testing.T) {
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
 		Namespace: "n1",
 		QueueID:   "q1",
 	}
-	discardAfter := DiscardAfter(time.Minute)
-	h := discardAfter(func(*work.Job, *work.DequeueOptions) error {
+	d := After(time.Minute)
+	h := d(func(*work.Job, *work.DequeueOptions) error {
 		return errors.New("no reason")
 	})
 

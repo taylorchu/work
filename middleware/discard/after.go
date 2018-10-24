@@ -1,4 +1,4 @@
-package middleware
+package discard
 
 import (
 	"time"
@@ -6,8 +6,8 @@ import (
 	"github.com/taylorchu/work"
 )
 
-// DiscardAfter discards a job if it is already stale.
-func DiscardAfter(d time.Duration) work.HandleMiddleware {
+// After discards a job if it is already stale.
+func After(d time.Duration) work.HandleMiddleware {
 	return func(f work.HandleFunc) work.HandleFunc {
 		return func(job *work.Job, opt *work.DequeueOptions) error {
 			err := f(job, opt)
