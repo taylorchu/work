@@ -70,7 +70,7 @@ func NewRedisQueue(client *redis.Client) Queue {
 
 	-- remove job from the queue
 	redis.call("zrem", queue_key, job_key)
-	return redis.status_reply("ok")
+	return redis.status_reply("acked")
 	`)
 
 	return &redisQueue{
