@@ -133,3 +133,35 @@ func TestConcurrency(t *testing.T) {
 	require.Len(t, z, 4)
 	require.Equal(t, []string{"w0", "w1", "w2", "w3"}, z)
 }
+
+func BenchmarkConcurrency(b *testing.B) {
+	b.StopTimer()
+
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(b, client.FlushAll().Err())
+
+	opt := &work.DequeueOptions{
+		Namespace:    "ns1",
+		QueueID:      "q1",
+		At:           work.NewTime(time.Now()),
+		InvisibleSec: 60,
+	}
+	var called int
+	h := func(*work.DequeueOptions) (*work.Job, error) {
+		called++
+		return work.NewJob(), nil
+	}
+
+	b.StartTimer()
+	for n := 0; n < b.N; n++ {
+		deq := Concurrency(&ConcurrencyOptions{
+			Client:   client,
+			Max:      2,
+			WorkerID: fmt.Sprintf("w%d", n),
+		})
+		deq(h)(opt)
+	}
+	b.StopTimer()
+	require.True(b, called <= 2)
+}
