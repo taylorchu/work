@@ -23,7 +23,7 @@ func TestWorkerStartStop(t *testing.T) {
 		func(*Job, *DequeueOptions) error { return nil },
 		&JobOptions{
 			MaxExecutionTime: time.Second,
-			IdleWait:         time.Second,
+			IdleWait:         10 * time.Millisecond,
 			NumGoroutines:    2,
 		},
 	)
@@ -86,7 +86,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		},
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         time.Second,
+			IdleWait:         10 * time.Millisecond,
 			NumGoroutines:    2,
 		},
 	)
@@ -102,7 +102,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		},
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         time.Second,
+			IdleWait:         10 * time.Millisecond,
 			NumGoroutines:    2,
 		},
 	)
@@ -163,7 +163,7 @@ func TestWorkerRunJob(t *testing.T) {
 		func(*Job, *DequeueOptions) error { return nil },
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         time.Second,
+			IdleWait:         10 * time.Millisecond,
 			NumGoroutines:    2,
 		},
 	)
@@ -172,7 +172,7 @@ func TestWorkerRunJob(t *testing.T) {
 		func(*Job, *DequeueOptions) error { return errors.New("no reason") },
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         time.Second,
+			IdleWait:         10 * time.Millisecond,
 			NumGoroutines:    2,
 		},
 	)
@@ -183,7 +183,7 @@ func TestWorkerRunJob(t *testing.T) {
 		},
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         time.Second,
+			IdleWait:         10 * time.Millisecond,
 			NumGoroutines:    2,
 		},
 	)
