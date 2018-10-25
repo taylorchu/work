@@ -35,13 +35,26 @@ func TestConcurrency(t *testing.T) {
 		return work.NewJob(), nil
 	}
 
-	// worker 0, 1 get the lock
-	// worker 2 is locked
 	for i := 0; i < 3; i++ {
 		deq := Concurrency(&ConcurrencyOptions{
 			Client:   client,
 			Max:      2,
 			WorkerID: fmt.Sprintf("w%d", i),
+		})
+		_, err := deq(h)(opt)
+
+		require.NoError(t, err)
+	}
+	require.Equal(t, 3, called)
+
+	// worker 0, 1 get the lock
+	// worker 2 is locked
+	for i := 0; i < 3; i++ {
+		deq := Concurrency(&ConcurrencyOptions{
+			Client:        client,
+			Max:           2,
+			WorkerID:      fmt.Sprintf("w%d", i),
+			disableUnlock: true,
 		})
 		_, err := deq(h)(opt)
 
@@ -51,87 +64,77 @@ func TestConcurrency(t *testing.T) {
 			require.Equal(t, work.ErrEmptyQueue, err)
 		}
 	}
-	require.Equal(t, 2, called)
+	require.Equal(t, 5, called)
 
-	z, err := client.ZRangeByScore("ns1:lock:q1",
-		redis.ZRangeBy{
-			Min: fmt.Sprint(opt.At.Unix()),
-			Max: "+inf",
-		}).Result()
-	require.NoError(t, err)
-	require.Len(t, z, 2)
-	require.Equal(t, []string{"w0", "w1"}, z)
-	z, err = client.ZRangeByScore("ns1:lock:q1",
+	z, err := client.ZRangeByScoreWithScores("ns1:lock:q1",
 		redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 2)
-	require.Equal(t, []string{"w0", "w1"}, z)
+	require.Equal(t, "w0", z[0].Member)
+	require.Equal(t, "w1", z[1].Member)
+	require.EqualValues(t, opt.At.Unix()+60, z[0].Score)
+	require.EqualValues(t, opt.At.Unix()+60, z[1].Score)
 
-	// worker 0 is locked for fairness
+	require.NoError(t, client.ZRem("ns1:lock:q1", "w1").Err())
+	optLater := *opt
+	optLater.At = work.NewTime(opt.At.Add(10 * time.Second))
+	// worker 0 is locked already
 	for i := 0; i < 3; i++ {
 		deq := Concurrency(&ConcurrencyOptions{
-			Client:   client,
-			Max:      2,
-			WorkerID: "w0",
+			Client:        client,
+			Max:           2,
+			WorkerID:      "w0",
+			disableUnlock: true,
 		})
-		_, err := deq(h)(opt)
+		_, err := deq(h)(&optLater)
 		require.Equal(t, work.ErrEmptyQueue, err)
 	}
-	require.Equal(t, 2, called)
+	require.Equal(t, 5, called)
 
-	// worker 3, 4, 5 are locked by worker 0, 1
-	for i := 3; i < 6; i++ {
-		deq := Concurrency(&ConcurrencyOptions{
-			Client:   client,
-			Max:      2,
-			WorkerID: fmt.Sprintf("w%d", i),
-		})
-		_, err := deq(h)(opt)
-
-		require.Equal(t, work.ErrEmptyQueue, err)
-	}
-	require.Equal(t, 2, called)
+	z, err = client.ZRangeByScoreWithScores("ns1:lock:q1",
+		redis.ZRangeBy{
+			Min: "-inf",
+			Max: "+inf",
+		}).Result()
+	require.NoError(t, err)
+	require.Len(t, z, 1)
+	require.Equal(t, "w0", z[0].Member)
+	require.EqualValues(t, opt.At.Unix()+60, z[0].Score)
 
 	// lock key expired
-	// worker 0, 1 are locked for fairness
-	// worker 2, 3 can proceed
-	// worker 4, 5 are locked
-	opt.At = work.NewTime(opt.At.Add(time.Minute + time.Second))
-	for i := 0; i < 6; i++ {
+	// worker 3, 4 get lock
+	optExpired := *opt
+	optExpired.At = work.NewTime(opt.At.Add(60 * time.Second))
+	for i := 3; i < 6; i++ {
 		deq := Concurrency(&ConcurrencyOptions{
-			Client:   client,
-			Max:      2,
-			WorkerID: fmt.Sprintf("w%d", i),
+			Client:        client,
+			Max:           2,
+			WorkerID:      fmt.Sprintf("w%d", i),
+			disableUnlock: true,
 		})
-		_, err := deq(h)(opt)
-
-		if 2 <= i && i <= 3 {
+		_, err := deq(h)(&optExpired)
+		if i < 5 {
 			require.NoError(t, err)
 		} else {
 			require.Equal(t, work.ErrEmptyQueue, err)
 		}
 	}
-	require.Equal(t, 4, called)
+	require.Equal(t, 7, called)
 
-	z, err = client.ZRangeByScore("ns1:lock:q1",
-		redis.ZRangeBy{
-			Min: fmt.Sprint(opt.At.Unix()),
-			Max: "+inf",
-		}).Result()
-	require.NoError(t, err)
-	require.Len(t, z, 2)
-	require.Equal(t, []string{"w2", "w3"}, z)
-	z, err = client.ZRangeByScore("ns1:lock:q1",
+	z, err = client.ZRangeByScoreWithScores("ns1:lock:q1",
 		redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
 	require.NoError(t, err)
-	require.Len(t, z, 4)
-	require.Equal(t, []string{"w0", "w1", "w2", "w3"}, z)
+	require.Len(t, z, 2)
+	require.Equal(t, "w3", z[0].Member)
+	require.Equal(t, "w4", z[1].Member)
+	require.EqualValues(t, optExpired.At.Unix()+60, z[0].Score)
+	require.EqualValues(t, optExpired.At.Unix()+60, z[1].Score)
 }
 
 func BenchmarkConcurrency(b *testing.B) {
@@ -163,5 +166,5 @@ func BenchmarkConcurrency(b *testing.B) {
 		deq(h)(opt)
 	}
 	b.StopTimer()
-	require.True(b, called <= 2)
+	require.Equal(b, b.N, called)
 }

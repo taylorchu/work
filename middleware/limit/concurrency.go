@@ -9,41 +9,36 @@ import (
 
 // ConcurrencyOptions defines how many jobs in the same queue can be running at the same time.
 type ConcurrencyOptions struct {
-	Client   *redis.Client `json:"-"`
-	Max      int64         `json:"max"`
-	WorkerID string        `json:"worker_id"`
+	Client        *redis.Client `json:"-"`
+	Max           int64         `json:"max"`
+	WorkerID      string        `json:"worker_id"`
+	disableUnlock bool          `json:"-"`
 }
 
 // Concurrency limits running job count from a queue.
 func Concurrency(copt *ConcurrencyOptions) work.DequeueMiddleware {
-	// The lock has several phases:
-	// (-inf, now - invis_sec]: all entries are stale, and should be gc-ed.
-	// (now - invis_sec, now): the entries are invalid but kept so that item locked
-	// in the previous period cannot be locked in the current period.
-	// [now, +inf): the entries are valid.
-	//
-	// This means that the entry lifetime is 2 * invis_sec.
-	script := redis.NewScript(`
+	lockScript := redis.NewScript(`
 	local opt = cjson.decode(ARGV[1])
 	local copt = cjson.decode(ARGV[2])
 	local lock_key = table.concat({opt.ns, "lock", opt.queue_id}, ":")
 
 	-- refresh expiry
-	redis.call("expire", lock_key, 2 * opt.invisible_sec)
+	redis.call("expire", lock_key, opt.invisible_sec)
 
 	-- remove stale entries
-	redis.call("zremrangebyscore", lock_key, "-inf", opt.at - opt.invisible_sec)
+	redis.call("zremrangebyscore", lock_key, "-inf", opt.at)
 
-	-- for lock fairness
-	if redis.call("zscore", lock_key, copt.worker_id) then
-		return 0
-	end
-
-	if redis.call("zcount", lock_key, opt.at, "+inf") < copt.max then
-		redis.call("zadd", lock_key, opt.at + opt.invisible_sec, copt.worker_id)
-		return 1
+	if redis.call("zcard", lock_key) < copt.max then
+		return redis.call("zadd", lock_key, "nx", opt.at + opt.invisible_sec, copt.worker_id)
 	end
 	return 0
+	`)
+	unlockScript := redis.NewScript(`
+	local opt = cjson.decode(ARGV[1])
+	local copt = cjson.decode(ARGV[2])
+	local lock_key = table.concat({opt.ns, "lock", opt.queue_id}, ":")
+
+	return redis.call("zrem", lock_key, copt.worker_id)
 	`)
 	return func(f work.DequeueFunc) work.DequeueFunc {
 		return func(opt *work.DequeueOptions) (*work.Job, error) {
@@ -59,14 +54,17 @@ func Concurrency(copt *ConcurrencyOptions) work.DequeueMiddleware {
 			if err != nil {
 				return nil, err
 			}
-			underLimit, err := script.Run(copt.Client, nil, optm, coptm).Int64()
+			acquired, err := lockScript.Run(copt.Client, nil, optm, coptm).Int64()
 			if err != nil {
 				return nil, err
 			}
-			if underLimit == 1 {
-				return f(opt)
+			if acquired == 0 {
+				return nil, work.ErrEmptyQueue
 			}
-			return nil, work.ErrEmptyQueue
+			if !copt.disableUnlock {
+				defer unlockScript.Run(copt.Client, nil, optm, coptm)
+			}
+			return f(opt)
 		}
 	}
 }
