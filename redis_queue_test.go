@@ -135,6 +135,56 @@ func TestRedisQueueDequeue(t *testing.T) {
 	require.Equal(t, ErrEmptyQueue, err)
 }
 
+func TestRedisQueueDequeueDeletedJob(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(t, client.FlushAll().Err())
+	q := NewRedisQueue(client)
+
+	type message struct {
+		Text string
+	}
+
+	job := NewJob()
+	err := job.MarshalPayload(message{Text: "hello"})
+	require.NoError(t, err)
+
+	err = q.Enqueue(job, &EnqueueOptions{
+		Namespace: "ns1",
+		QueueID:   "q1",
+		At:        job.CreatedAt,
+	})
+	require.NoError(t, err)
+
+	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
+
+	h, err := client.HGetAll(jobKey).Result()
+	require.NoError(t, err)
+	jobm, err := json.Marshal(job)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{
+		"json": string(jobm),
+	}, h)
+
+	require.NoError(t, client.Del(jobKey).Err())
+
+	_, err = q.Dequeue(&DequeueOptions{
+		Namespace:    "ns1",
+		QueueID:      "q1",
+		At:           job.CreatedAt,
+		InvisibleSec: 60,
+	})
+	require.Equal(t, redis.Nil, err)
+
+	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
+		redis.ZRangeBy{
+			Min: "-inf",
+			Max: "+inf",
+		}).Result()
+	require.NoError(t, err)
+	require.Len(t, z, 0)
+}
+
 func TestRedisQueueAck(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
@@ -159,6 +209,7 @@ func TestRedisQueueAck(t *testing.T) {
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 1)
+	require.Equal(t, jobKey, z[0].Member)
 
 	e, err := client.Exists(jobKey).Result()
 	require.NoError(t, err)

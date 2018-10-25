@@ -40,15 +40,21 @@ func NewRedisQueue(client *redis.Client) Queue {
 	if table.getn(jobs) == 0 then
 		return redis.error_reply("empty")
 	end
-	local job_id = jobs[1]
-	local resp = redis.call("hgetall", job_id)
+	local job_key = jobs[1]
+	local resp = redis.call("hgetall", job_key)
 	local job = {}
 	for i = 1,table.getn(resp),2 do
 		job[resp[i]] = resp[i+1]
 	end
 
+	-- job is deleted unexpectedly
+	if job.json == nil then
+		redis.call("zrem", queue_key, job_key)
+		return nil
+	end
+
 	-- mark it as "processing" by increasing the score
-	redis.call("zincrby", queue_key, opt.invisible_sec, job_id)
+	redis.call("zincrby", queue_key, opt.invisible_sec, job_key)
 
 	return job.json
 	`)
