@@ -32,6 +32,22 @@ var (
 		},
 		[]string{"namespace", "queue", "status"},
 	)
+	jobReadyTotal = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "work",
+			Name:      "job_ready_total",
+			Help:      "Total jobs that can be executed now",
+		},
+		[]string{"namespace", "queue"},
+	)
+	jobScheduledTotal = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "work",
+			Name:      "job_scheduled_total",
+			Help:      "Total jobs that can only be executed in future",
+		},
+		[]string{"namespace", "queue"},
+	)
 )
 
 func init() {
@@ -39,6 +55,9 @@ func init() {
 	prometheus.MustRegister(jobExecutedTotal)
 
 	prometheus.MustRegister(jobEnqueuedTotal)
+
+	prometheus.MustRegister(jobReadyTotal)
+	prometheus.MustRegister(jobScheduledTotal)
 }
 
 // HandleFuncMetrics adds prometheus metrics like executed job count.
@@ -67,6 +86,19 @@ func EnqueueFuncMetrics(f work.EnqueueFunc) work.EnqueueFunc {
 		jobEnqueuedTotal.WithLabelValues(opt.Namespace, opt.QueueID, "success").Inc()
 		return nil
 	}
+}
+
+// ExportWorkerMetrics adds prometheus metrics from work.Worker.
+func ExportWorkerMetrics(w *work.Worker) error {
+	all, err := w.ExportMetrics()
+	if err != nil {
+		return err
+	}
+	for _, m := range all.Queue {
+		jobReadyTotal.WithLabelValues(m.Namespace, m.QueueID).Set(float64(m.ReadyTotal))
+		jobScheduledTotal.WithLabelValues(m.Namespace, m.QueueID).Set(float64(m.ScheduledTotal))
+	}
+	return nil
 }
 
 var (

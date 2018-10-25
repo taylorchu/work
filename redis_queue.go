@@ -2,6 +2,7 @@ package work
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/go-redis/redis"
 )
@@ -131,4 +132,29 @@ func (q *redisQueue) Ack(job *Job, opt *AckOptions) error {
 		return err
 	}
 	return q.ackScript.Run(q.client, nil, optm, job.ID).Err()
+}
+
+var _ MetricsExporter = (*redisQueue)(nil)
+
+func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, error) {
+	err := opt.Validate()
+	if err != nil {
+		return nil, err
+	}
+	queueKey := fmt.Sprintf("%s:queue:%s", opt.Namespace, opt.QueueID)
+	now := fmt.Sprint(opt.At.Unix())
+	readyTotal, err := q.client.ZCount(queueKey, "-inf", now).Result()
+	if err != nil {
+		return nil, err
+	}
+	scheduledTotal, err := q.client.ZCount(queueKey, "("+now, "+inf").Result()
+	if err != nil {
+		return nil, err
+	}
+	return &QueueMetrics{
+		Namespace:      opt.Namespace,
+		QueueID:        opt.QueueID,
+		ReadyTotal:     readyTotal,
+		ScheduledTotal: scheduledTotal,
+	}, nil
 }

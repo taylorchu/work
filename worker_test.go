@@ -35,6 +35,32 @@ func TestWorkerStartStop(t *testing.T) {
 	}
 }
 
+func TestWorkerExportMetrics(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(t, client.FlushAll().Err())
+
+	w := NewWorker(&WorkerOptions{
+		Namespace: "ns1",
+		Queue:     NewRedisQueue(client),
+	})
+	err := w.Register("test",
+		func(*Job, *DequeueOptions) error { return nil },
+		&JobOptions{
+			MaxExecutionTime: time.Second,
+			IdleWait:         10 * time.Millisecond,
+			NumGoroutines:    2,
+		},
+	)
+	require.NoError(t, err)
+
+	all, err := w.ExportMetrics()
+	require.NoError(t, err)
+	require.Len(t, all.Queue, 1)
+	require.Equal(t, all.Queue[0].Namespace, "ns1")
+	require.Equal(t, all.Queue[0].QueueID, "test")
+}
+
 func waitEmpty(client *redis.Client, key string, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()

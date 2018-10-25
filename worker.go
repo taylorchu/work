@@ -96,6 +96,9 @@ var (
 	// ErrUnrecoverable is returned if the error is unrecoverable.
 	// The job will be discarded.
 	ErrUnrecoverable = errors.New("work: permanent error")
+
+	// ErrUnsupported is returned if it is not implemented.
+	ErrUnsupported = errors.New("work: unsupported")
 )
 
 // Enqueue enqueues a job.
@@ -211,6 +214,31 @@ func (w *Worker) Start() {
 		}
 	}
 	w.stop = stop
+}
+
+// ExportMetrics dumps queue stats if the queue implements MetricsExporter.
+func (w *Worker) ExportMetrics() (*Metrics, error) {
+	exporter, ok := w.queue.(MetricsExporter)
+	if !ok {
+		return nil, ErrUnsupported
+	}
+	var (
+		queueMetrics []*QueueMetrics
+	)
+	for _, h := range w.handlerMap {
+		m, err := exporter.GetQueueMetrics(&QueueMetricsOptions{
+			Namespace: w.namespace,
+			QueueID:   h.QueueID,
+			At:        NewTime(time.Now()),
+		})
+		if err != nil {
+			return nil, err
+		}
+		queueMetrics = append(queueMetrics, m)
+	}
+	return &Metrics{
+		Queue: queueMetrics,
+	}, nil
 }
 
 // Stop stops the worker.

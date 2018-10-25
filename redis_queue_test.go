@@ -233,3 +233,41 @@ func TestRedisQueueAck(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 0, e)
 }
+
+func TestRedisQueueGetQueueMetrics(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(t, client.FlushAll().Err())
+	q := NewRedisQueue(client)
+
+	job := NewJob()
+
+	err := q.Enqueue(job, &EnqueueOptions{
+		Namespace: "ns1",
+		QueueID:   "q1",
+		At:        job.CreatedAt,
+	})
+	require.NoError(t, err)
+
+	m, err := q.(MetricsExporter).GetQueueMetrics(&QueueMetricsOptions{
+		Namespace: "ns1",
+		QueueID:   "q1",
+		At:        job.CreatedAt,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "ns1", m.Namespace)
+	require.Equal(t, "q1", m.QueueID)
+	require.EqualValues(t, 1, m.ReadyTotal)
+	require.EqualValues(t, 0, m.ScheduledTotal)
+
+	m, err = q.(MetricsExporter).GetQueueMetrics(&QueueMetricsOptions{
+		Namespace: "ns1",
+		QueueID:   "q1",
+		At:        NewTime(job.CreatedAt.Add(-time.Second)),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "ns1", m.Namespace)
+	require.Equal(t, "q1", m.QueueID)
+	require.EqualValues(t, 0, m.ReadyTotal)
+	require.EqualValues(t, 1, m.ScheduledTotal)
+}

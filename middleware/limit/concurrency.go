@@ -9,10 +9,11 @@ import (
 
 // ConcurrencyOptions defines how many jobs in the same queue can be running at the same time.
 type ConcurrencyOptions struct {
-	Client        *redis.Client `json:"-"`
-	Max           int64         `json:"max"`
-	WorkerID      string        `json:"worker_id"`
-	disableUnlock bool          `json:"-"`
+	Client   *redis.Client `json:"-"`
+	Max      int64         `json:"max"`
+	WorkerID string        `json:"worker_id"`
+
+	disableUnlock bool // for testing
 }
 
 // Concurrency limits running job count from a queue.
