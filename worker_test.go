@@ -39,7 +39,7 @@ func waitEmpty(client *redis.Client, key string, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
 
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
