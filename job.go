@@ -1,40 +1,40 @@
 package work
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/vmihailenco/msgpack"
 )
 
 // Job is a single unit of work.
 type Job struct {
 	// ID is the unique id of a job.
-	ID string `json:"id"`
+	ID string `msgpack:"id"`
 	// CreatedAt is set to the time when NewJob() is called.
-	CreatedAt Time `json:"created_at"`
+	CreatedAt time.Time `msgpack:"created_at"`
 	// UpdatedAt is when the job is last executed.
 	// UpdatedAt is set to the time when NewJob() is called initially.
-	UpdatedAt Time `json:"updated_at"`
+	UpdatedAt time.Time `msgpack:"updated_at"`
 
-	// Payload is raw json bytes.
-	Payload json.RawMessage `json:"payload"`
+	// Payload is raw bytes.
+	Payload []byte `msgpack:"payload"`
 
 	// If the job previously fails, Retries will be incremented.
-	Retries int64 `json:"retries"`
+	Retries int64 `msgpack:"retries"`
 	// If the job previously fails, LastError will be populated with error string.
-	LastError string `json:"last_error"`
+	LastError string `msgpack:"last_error"`
 }
 
 // UnmarshalPayload decodes the payload into a variable.
 func (j *Job) UnmarshalPayload(v interface{}) error {
-	return json.Unmarshal(j.Payload, v)
+	return msgpack.Unmarshal(j.Payload, v)
 }
 
 // MarshalPayload encodes a variable into the payload.
 func (j *Job) MarshalPayload(v interface{}) error {
-	b, err := json.Marshal(v)
+	b, err := msgpack.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (j *Job) MarshalPayload(v interface{}) error {
 // NewJob creates a job.
 func NewJob() *Job {
 	id := uuid.New().String()
-	now := NewTime(time.Now())
+	now := time.Now().Truncate(time.Second)
 	return &Job{
 		ID:        id,
 		CreatedAt: now,
@@ -55,7 +55,7 @@ func NewJob() *Job {
 
 // Delay creates a job that can be executed in future.
 func (j Job) Delay(d time.Duration) *Job {
-	j.CreatedAt = NewTime(j.CreatedAt.Time.Add(d))
+	j.CreatedAt = j.CreatedAt.Add(d)
 	j.UpdatedAt = j.CreatedAt
 	return &j
 }
@@ -71,12 +71,12 @@ var (
 // EnqueueOptions specifies how a job is enqueued.
 type EnqueueOptions struct {
 	// Namespace is the namespace of a queue.
-	Namespace string `json:"ns"`
+	Namespace string
 	// QueueID is the id of a queue.
-	QueueID string `json:"queue_id"`
+	QueueID string
 	// At is the current time of the enqueuer.
 	// Use this to delay job execution.
-	At Time `json:"at"`
+	At time.Time
 }
 
 // Validate validates EnqueueOptions.
@@ -101,15 +101,15 @@ type Enqueuer interface {
 // DequeueOptions specifies how a job is dequeued.
 type DequeueOptions struct {
 	// Namespace is the namespace of a queue.
-	Namespace string `json:"ns"`
+	Namespace string
 	// QueueID is the id of a queue.
-	QueueID string `json:"queue_id"`
+	QueueID string
 	// At is the current time of the dequeuer.
 	// Any job that is scheduled before this can be executed.
-	At Time `json:"at"`
+	At time.Time
 	// After the job is dequeued, no other dequeuer can see this job for a while.
 	// InvisibleSec controls how long this period is.
-	InvisibleSec int64 `json:"invisible_sec"`
+	InvisibleSec int64
 }
 
 // Validate validates DequeueOptions.
@@ -131,8 +131,8 @@ func (opt *DequeueOptions) Validate() error {
 
 // AckOptions specifies how a job is deleted from a queue.
 type AckOptions struct {
-	Namespace string `json:"ns"`
-	QueueID   string `json:"queue_id"`
+	Namespace string
+	QueueID   string
 }
 
 // Validate validates AckOptions.

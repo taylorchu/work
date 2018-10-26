@@ -12,7 +12,7 @@ func After(d time.Duration) work.HandleMiddleware {
 		return func(job *work.Job, opt *work.DequeueOptions) error {
 			err := f(job, opt)
 			if err != nil {
-				if time.Now().Sub(job.CreatedAt.Time) > d {
+				if time.Now().Sub(job.CreatedAt) > d {
 					return work.ErrUnrecoverable
 				}
 				return err

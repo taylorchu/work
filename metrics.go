@@ -1,5 +1,7 @@
 package work
 
+import "time"
+
 // QueueMetrics contains metrics from a queue.
 type QueueMetrics struct {
 	Namespace string
@@ -22,9 +24,9 @@ type Metrics struct {
 
 // QueueMetricsOptions specifies how to fetch queue metrics.
 type QueueMetricsOptions struct {
-	Namespace string `json:"ns"`
-	QueueID   string `json:"queue_id"`
-	At        Time   `json:"at"`
+	Namespace string
+	QueueID   string
+	At        time.Time
 }
 
 // Validate validates QueueMetricsOptions.

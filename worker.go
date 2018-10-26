@@ -174,11 +174,11 @@ func (w *Worker) Start() {
 							now := time.Now()
 							job.Retries++
 							job.LastError = err.Error()
-							job.UpdatedAt = NewTime(now)
+							job.UpdatedAt = now
 							w.queue.Enqueue(job, &EnqueueOptions{
 								Namespace: w.namespace,
 								QueueID:   h.QueueID,
-								At:        NewTime(now.Add(time.Duration(job.Retries) * 2 * h.JobOptions.MaxExecutionTime)),
+								At:        now.Add(time.Duration(job.Retries) * 2 * h.JobOptions.MaxExecutionTime),
 							})
 							return err
 						}
@@ -199,7 +199,7 @@ func (w *Worker) Start() {
 							opt := &DequeueOptions{
 								Namespace:    w.namespace,
 								QueueID:      h.QueueID,
-								At:           NewTime(time.Now()),
+								At:           time.Now(),
 								InvisibleSec: int64(2 * h.JobOptions.MaxExecutionTime / time.Second),
 							}
 							job, err := dequeue(opt)
@@ -229,7 +229,7 @@ func (w *Worker) ExportMetrics() (*Metrics, error) {
 		m, err := exporter.GetQueueMetrics(&QueueMetricsOptions{
 			Namespace: w.namespace,
 			QueueID:   h.QueueID,
-			At:        NewTime(time.Now()),
+			At:        time.Now(),
 		})
 		if err != nil {
 			return nil, err

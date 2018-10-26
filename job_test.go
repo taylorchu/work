@@ -11,8 +11,8 @@ func TestJobDelay(t *testing.T) {
 	job := NewJob()
 	job2 := job.Delay(time.Hour)
 
-	require.Equal(t, time.Hour, job2.CreatedAt.Sub(job.CreatedAt.Time))
-	require.Equal(t, time.Hour, job2.UpdatedAt.Sub(job.UpdatedAt.Time))
+	require.Equal(t, time.Hour, job2.CreatedAt.Sub(job.CreatedAt))
+	require.Equal(t, time.Hour, job2.UpdatedAt.Sub(job.UpdatedAt))
 }
 
 func TestJobMarshal(t *testing.T) {

@@ -1,13 +1,13 @@
 package work
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack"
 )
 
 func newRedisClient() *redis.Client {
@@ -43,10 +43,10 @@ func TestRedisQueueEnqueue(t *testing.T) {
 
 	h, err := client.HGetAll(jobKey).Result()
 	require.NoError(t, err)
-	jobm, err := json.Marshal(job)
+	jobm, err := msgpack.Marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"json": string(jobm),
+		"msgpack": string(jobm),
 	}, h)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
@@ -61,7 +61,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 	err = q.Enqueue(job, &EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "q1",
-		At:        NewTime(job.CreatedAt.Add(time.Minute)),
+		At:        job.CreatedAt.Add(time.Minute),
 	})
 	require.NoError(t, err)
 
@@ -109,10 +109,10 @@ func TestRedisQueueDequeue(t *testing.T) {
 
 	h, err := client.HGetAll(jobKey).Result()
 	require.NoError(t, err)
-	jobm, err := json.Marshal(job)
+	jobm, err := msgpack.Marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"json": string(jobm),
+		"msgpack": string(jobm),
 	}, h)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
@@ -160,10 +160,10 @@ func TestRedisQueueDequeueDeletedJob(t *testing.T) {
 
 	h, err := client.HGetAll(jobKey).Result()
 	require.NoError(t, err)
-	jobm, err := json.Marshal(job)
+	jobm, err := msgpack.Marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
-		"json": string(jobm),
+		"msgpack": string(jobm),
 	}, h)
 
 	require.NoError(t, client.Del(jobKey).Err())
@@ -263,7 +263,7 @@ func TestRedisQueueGetQueueMetrics(t *testing.T) {
 	m, err = q.(MetricsExporter).GetQueueMetrics(&QueueMetricsOptions{
 		Namespace: "ns1",
 		QueueID:   "q1",
-		At:        NewTime(job.CreatedAt.Add(-time.Second)),
+		At:        job.CreatedAt.Add(-time.Second),
 	})
 	require.NoError(t, err)
 	require.Equal(t, "ns1", m.Namespace)

@@ -26,7 +26,7 @@ func TestConcurrency(t *testing.T) {
 	opt := &work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "q1",
-		At:           work.NewTime(time.Now()),
+		At:           time.Now(),
 		InvisibleSec: 60,
 	}
 	var called int
@@ -80,7 +80,7 @@ func TestConcurrency(t *testing.T) {
 
 	require.NoError(t, client.ZRem("ns1:lock:q1", "w1").Err())
 	optLater := *opt
-	optLater.At = work.NewTime(opt.At.Add(10 * time.Second))
+	optLater.At = opt.At.Add(10 * time.Second)
 	// worker 0 is locked already
 	for i := 0; i < 3; i++ {
 		deq := Concurrency(&ConcurrencyOptions{
@@ -107,7 +107,7 @@ func TestConcurrency(t *testing.T) {
 	// lock key expired
 	// worker 3, 4 get lock
 	optExpired := *opt
-	optExpired.At = work.NewTime(opt.At.Add(60 * time.Second))
+	optExpired.At = opt.At.Add(60 * time.Second)
 	for i := 3; i < 6; i++ {
 		deq := Concurrency(&ConcurrencyOptions{
 			Client:        client,
@@ -147,7 +147,7 @@ func BenchmarkConcurrency(b *testing.B) {
 	opt := &work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "q1",
-		At:           work.NewTime(time.Now()),
+		At:           time.Now(),
 		InvisibleSec: 60,
 	}
 	var called int

@@ -21,8 +21,8 @@ func HandleFuncLogger(f work.HandleFunc) work.HandleFunc {
 			logger.WithFields(logrus.Fields{
 				"last_error": job.LastError,
 				"retries":    job.Retries,
-				"created_at": job.CreatedAt.Time,
-				"updated_at": job.UpdatedAt.Time,
+				"created_at": job.CreatedAt,
+				"updated_at": job.UpdatedAt,
 			}).WithError(err).Error("Job failed.")
 			return err
 		}
@@ -44,7 +44,7 @@ func EnqueueFuncLogger(f work.EnqueueFunc) work.EnqueueFunc {
 			logger.WithError(err).Error("Job failed to enqueue.")
 			return err
 		}
-		logger.WithField("enqueued_at", opt.At.Time).Info("Job enqueued.")
+		logger.WithField("enqueued_at", opt.At).Info("Job enqueued.")
 		return nil
 	}
 }

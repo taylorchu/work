@@ -266,7 +266,7 @@ func TestWorkerRunJob(t *testing.T) {
 		job, err := NewRedisQueue(client).Dequeue(&DequeueOptions{
 			Namespace:    "ns1",
 			QueueID:      "failure",
-			At:           NewTime(time.Now().Add(time.Hour)),
+			At:           time.Now().Add(time.Hour),
 			InvisibleSec: 3600,
 		})
 		require.NoError(t, err)
@@ -300,7 +300,7 @@ func TestWorkerRunJob(t *testing.T) {
 		job, err := NewRedisQueue(client).Dequeue(&DequeueOptions{
 			Namespace:    "ns1",
 			QueueID:      "panic",
-			At:           NewTime(time.Now().Add(time.Hour)),
+			At:           time.Now().Add(time.Hour),
 			InvisibleSec: 3600,
 		})
 		require.NoError(t, err)

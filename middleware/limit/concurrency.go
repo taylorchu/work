@@ -1,17 +1,15 @@
 package limit
 
 import (
-	"encoding/json"
-
 	"github.com/go-redis/redis"
 	"github.com/taylorchu/work"
 )
 
 // ConcurrencyOptions defines how many jobs in the same queue can be running at the same time.
 type ConcurrencyOptions struct {
-	Client   *redis.Client `json:"-"`
-	Max      int64         `json:"max"`
-	WorkerID string        `json:"worker_id"`
+	Client   *redis.Client
+	WorkerID string
+	Max      int64
 
 	disableUnlock bool // for testing
 }
@@ -19,27 +17,32 @@ type ConcurrencyOptions struct {
 // Concurrency limits running job count from a queue.
 func Concurrency(copt *ConcurrencyOptions) work.DequeueMiddleware {
 	lockScript := redis.NewScript(`
-	local opt = cjson.decode(ARGV[1])
-	local copt = cjson.decode(ARGV[2])
-	local lock_key = table.concat({opt.ns, "lock", opt.queue_id}, ":")
+	local ns = ARGV[1]
+	local queue_id = ARGV[2]
+	local at = tonumber(ARGV[3])
+	local invis_sec = tonumber(ARGV[4])
+	local worker_id = ARGV[5]
+	local max = tonumber(ARGV[6])
+	local lock_key = table.concat({ns, "lock", queue_id}, ":")
 
 	-- refresh expiry
-	redis.call("expire", lock_key, opt.invisible_sec)
+	redis.call("expire", lock_key, invis_sec)
 
 	-- remove stale entries
-	redis.call("zremrangebyscore", lock_key, "-inf", opt.at)
+	redis.call("zremrangebyscore", lock_key, "-inf", at)
 
-	if redis.call("zcard", lock_key) < copt.max then
-		return redis.call("zadd", lock_key, "nx", opt.at + opt.invisible_sec, copt.worker_id)
+	if redis.call("zcard", lock_key) < max then
+		return redis.call("zadd", lock_key, "nx", at + invis_sec, worker_id)
 	end
 	return 0
 	`)
 	unlockScript := redis.NewScript(`
-	local opt = cjson.decode(ARGV[1])
-	local copt = cjson.decode(ARGV[2])
-	local lock_key = table.concat({opt.ns, "lock", opt.queue_id}, ":")
+	local ns = ARGV[1]
+	local queue_id = ARGV[2]
+	local worker_id = ARGV[3]
+	local lock_key = table.concat({ns, "lock", queue_id}, ":")
 
-	return redis.call("zrem", lock_key, copt.worker_id)
+	return redis.call("zrem", lock_key, worker_id)
 	`)
 	return func(f work.DequeueFunc) work.DequeueFunc {
 		return func(opt *work.DequeueOptions) (*work.Job, error) {
@@ -47,15 +50,14 @@ func Concurrency(copt *ConcurrencyOptions) work.DequeueMiddleware {
 			if err != nil {
 				return nil, err
 			}
-			optm, err := json.Marshal(opt)
-			if err != nil {
-				return nil, err
-			}
-			coptm, err := json.Marshal(copt)
-			if err != nil {
-				return nil, err
-			}
-			acquired, err := lockScript.Run(copt.Client, nil, optm, coptm).Int64()
+			acquired, err := lockScript.Run(copt.Client, nil,
+				opt.Namespace,
+				opt.QueueID,
+				opt.At.Unix(),
+				opt.InvisibleSec,
+				copt.WorkerID,
+				copt.Max,
+			).Int64()
 			if err != nil {
 				return nil, err
 			}
@@ -63,7 +65,11 @@ func Concurrency(copt *ConcurrencyOptions) work.DequeueMiddleware {
 				return nil, work.ErrEmptyQueue
 			}
 			if !copt.disableUnlock {
-				defer unlockScript.Run(copt.Client, nil, optm, coptm)
+				defer unlockScript.Run(copt.Client, nil,
+					opt.Namespace,
+					opt.QueueID,
+					copt.WorkerID,
+				)
 			}
 			return f(opt)
 		}
