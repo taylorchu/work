@@ -232,6 +232,12 @@ func TestRedisQueueAck(t *testing.T) {
 	e, err = client.Exists(jobKey).Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, e)
+
+	err = q.Ack(job, &AckOptions{
+		Namespace: "ns1",
+		QueueID:   "q1",
+	})
+	require.NoError(t, err)
 }
 
 func TestRedisQueueGetQueueMetrics(t *testing.T) {
