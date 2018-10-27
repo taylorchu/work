@@ -124,11 +124,16 @@ func (w *Worker) Register(queueID string, h HandleFunc, opt *JobOptions) error {
 	if err != nil {
 		return err
 	}
-	w.handlerMap[queueID] = handler{
+	hdr := handler{
 		QueueID:    queueID,
 		HandleFunc: h,
 		JobOptions: *opt,
 	}
+	// add default middleware
+	hdr.JobOptions.DequeueMiddleware = append(hdr.JobOptions.DequeueMiddleware, idleWait(opt.IdleWait))
+	hdr.JobOptions.HandleMiddleware = append(hdr.JobOptions.HandleMiddleware, catchPanic, retry(w.queue))
+
+	w.handlerMap[queueID] = hdr
 	return nil
 }
 
@@ -141,54 +146,15 @@ func (w *Worker) Start() {
 			go func(h handler) {
 				defer w.wg.Done()
 
-				dequeue := w.queue.Dequeue
+				dequeue := getDequeueFunc(w.queue)
 				for _, mw := range h.JobOptions.DequeueMiddleware {
 					dequeue = mw(dequeue)
 				}
-				// add idleWait middleware
-				idleWait := func(f DequeueFunc) DequeueFunc {
-					return func(opt *DequeueOptions) (*Job, error) {
-						job, err := f(opt)
-						if err != nil {
-							if err == ErrEmptyQueue {
-								time.Sleep(h.JobOptions.IdleWait)
-							}
-							return nil, err
-						}
-						return job, nil
-					}
-				}
-				dequeue = idleWait(dequeue)
 
 				handle := h.HandleFunc
 				for _, mw := range h.JobOptions.HandleMiddleware {
 					handle = mw(handle)
 				}
-				// add catchPanic middleware
-				handle = catchPanic(handle)
-				// add retry middleware
-				retry := func(f HandleFunc) HandleFunc {
-					return func(job *Job, opt *DequeueOptions) error {
-						err := f(job, opt)
-						if err != nil && err != ErrUnrecoverable {
-							now := time.Now()
-							job.Retries++
-							job.LastError = err.Error()
-							job.UpdatedAt = now
-							w.queue.Enqueue(job, &EnqueueOptions{
-								Namespace: w.namespace,
-								QueueID:   h.QueueID,
-								At:        now.Add(time.Duration(job.Retries) * 2 * h.JobOptions.MaxExecutionTime),
-							})
-							return err
-						}
-						return w.queue.Ack(job, &AckOptions{
-							Namespace: w.namespace,
-							QueueID:   h.QueueID,
-						})
-					}
-				}
-				handle = retry(handle)
 
 				for {
 					select {
@@ -214,6 +180,31 @@ func (w *Worker) Start() {
 		}
 	}
 	w.stop = stop
+}
+
+func getDequeueFunc(queue Queue) DequeueFunc {
+	bulkDeq, ok := queue.(bulkDequeuer)
+	if !ok {
+		return queue.Dequeue
+	}
+
+	var jobs []*Job
+	return func(opt *DequeueOptions) (*Job, error) {
+		if len(jobs) == 0 {
+			const count = 1000
+			bulkOpt := *opt
+			bulkOpt.InvisibleSec *= count
+
+			var err error
+			jobs, err = bulkDeq.BulkDequeue(count, &bulkOpt)
+			if err != nil {
+				return nil, err
+			}
+		}
+		job := jobs[0]
+		jobs = jobs[1:]
+		return job, nil
+	}
 }
 
 // ExportMetrics dumps queue stats if the queue implements MetricsExporter.
@@ -247,6 +238,21 @@ func (w *Worker) Stop() {
 	w.wg.Wait()
 }
 
+func idleWait(d time.Duration) DequeueMiddleware {
+	return func(f DequeueFunc) DequeueFunc {
+		return func(opt *DequeueOptions) (*Job, error) {
+			job, err := f(opt)
+			if err != nil {
+				if err == ErrEmptyQueue {
+					time.Sleep(d)
+				}
+				return nil, err
+			}
+			return job, nil
+		}
+	}
+}
+
 func catchPanic(f HandleFunc) HandleFunc {
 	return func(job *Job, opt *DequeueOptions) (err error) {
 		defer func() {
@@ -255,5 +261,29 @@ func catchPanic(f HandleFunc) HandleFunc {
 			}
 		}()
 		return f(job, opt)
+	}
+}
+
+func retry(queue Queue) HandleMiddleware {
+	return func(f HandleFunc) HandleFunc {
+		return func(job *Job, opt *DequeueOptions) error {
+			err := f(job, opt)
+			if err != nil && err != ErrUnrecoverable {
+				now := time.Now()
+				job.Retries++
+				job.LastError = err.Error()
+				job.UpdatedAt = now
+				queue.Enqueue(job, &EnqueueOptions{
+					Namespace: opt.Namespace,
+					QueueID:   opt.QueueID,
+					At:        now.Add(time.Duration(job.Retries*opt.InvisibleSec) * time.Second),
+				})
+				return err
+			}
+			return queue.Ack(job, &AckOptions{
+				Namespace: opt.Namespace,
+				QueueID:   opt.QueueID,
+			})
+		}
 	}
 }

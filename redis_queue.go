@@ -22,16 +22,19 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local ns = ARGV[1]
 	local queue_id = ARGV[2]
 	local at = tonumber(ARGV[3])
-	local job_id = ARGV[4]
-	local job = ARGV[5]
-	local job_key = table.concat({ns, "job", job_id}, ":")
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
-	-- update job fields
-	redis.call("hset", job_key, "msgpack", job)
+	for i = 4,table.getn(ARGV),2 do
+		local job_id = ARGV[i]
+		local job = ARGV[i+1]
+		local job_key = table.concat({ns, "job", job_id}, ":")
 
-	-- enqueue
-	redis.call("zadd", queue_key, at, job_key)
+		-- update job fields
+		redis.call("hset", job_key, "msgpack", job)
+
+		-- enqueue
+		redis.call("zadd", queue_key, at, job_key)
+	end
 	return redis.status_reply("queued")
 	`)
 
@@ -40,44 +43,52 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local queue_id = ARGV[2]
 	local at = tonumber(ARGV[3])
 	local invis_sec = tonumber(ARGV[4])
+	local count = tonumber(ARGV[5])
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
 	-- get job
-	local jobs = redis.call("zrangebyscore", queue_key, "-inf", at, "limit", 0, 1)
-	if table.getn(jobs) == 0 then
-		return redis.error_reply("empty")
-	end
-	local job_key = jobs[1]
-	local resp = redis.call("hgetall", job_key)
-	local job = {}
-	for i = 1,table.getn(resp),2 do
-		job[resp[i]] = resp[i+1]
+	local jobs = redis.call("zrangebyscore", queue_key, "-inf", at, "limit", 0, count)
+
+	local jobm = {}
+	for idx, job_key in pairs(jobs) do
+		local resp = redis.call("hgetall", job_key)
+		local job = {}
+		for i = 1,table.getn(resp),2 do
+			job[resp[i]] = resp[i+1]
+		end
+
+		-- job is deleted unexpectedly
+		if job.msgpack == nil then
+			redis.call("zrem", queue_key, job_key)
+		else
+			-- mark it as "processing" by increasing the score
+			redis.call("zincrby", queue_key, invis_sec, job_key)
+			table.insert(jobm, job.msgpack)
+		end
 	end
 
-	-- job is deleted unexpectedly
-	if job.msgpack == nil then
-		redis.call("zrem", queue_key, job_key)
+	if table.getn(jobm) == 0 then
 		return nil
 	end
-
-	-- mark it as "processing" by increasing the score
-	redis.call("zincrby", queue_key, invis_sec, job_key)
-
-	return job.msgpack
+	return jobm
 	`)
 
 	ackScript := redis.NewScript(`
 	local ns = ARGV[1]
 	local queue_id = ARGV[2]
-	local job_id = ARGV[3]
-	local job_key = table.concat({ns, "job", job_id}, ":")
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
-	-- delete job fields
-	redis.call("del", job_key)
+	for i = 3,table.getn(ARGV) do
+		local job_id = ARGV[i]
+		local job_key = table.concat({ns, "job", job_id}, ":")
 
-	-- remove job from the queue
-	redis.call("zrem", queue_key, job_key)
+		-- delete job fields
+		redis.call("del", job_key)
+
+		-- remove job from the queue
+		redis.call("zrem", queue_key, job_key)
+	end
+
 	return redis.status_reply("acked")
 	`)
 
@@ -90,61 +101,91 @@ func NewRedisQueue(client *redis.Client) Queue {
 }
 
 func (q *redisQueue) Enqueue(job *Job, opt *EnqueueOptions) error {
+	return q.BulkEnqueue([]*Job{job}, opt)
+}
+
+func (q *redisQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
 	}
-	jobm, err := msgpack.Marshal(job)
-	if err != nil {
-		return err
+	args := make([]interface{}, 3+2*len(jobs))
+	args[0] = opt.Namespace
+	args[1] = opt.QueueID
+	args[2] = opt.At.Unix()
+	for i, job := range jobs {
+		jobm, err := msgpack.Marshal(job)
+		if err != nil {
+			return err
+		}
+		args[3+2*i] = job.ID
+		args[3+2*i+1] = jobm
 	}
-	return q.enqueueScript.Run(q.client, nil,
-		opt.Namespace,
-		opt.QueueID,
-		opt.At.Unix(),
-		job.ID,
-		jobm,
-	).Err()
+	return q.enqueueScript.Run(q.client, nil, args...).Err()
 }
 
 func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
+	jobs, err := q.BulkDequeue(1, opt)
+	if err != nil {
+		return nil, err
+	}
+	return jobs[0], nil
+}
+
+func (q *redisQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, error) {
 	err := opt.Validate()
 	if err != nil {
 		return nil, err
 	}
-	s, err := q.dequeueScript.Run(q.client, nil,
+	res, err := q.dequeueScript.Run(q.client, nil,
 		opt.Namespace,
 		opt.QueueID,
 		opt.At.Unix(),
 		opt.InvisibleSec,
-	).String()
+		count,
+	).Result()
 	if err != nil {
-		if err.Error() == "empty" {
+		if err == redis.Nil {
 			return nil, ErrEmptyQueue
 		}
 		return nil, err
 	}
-	var job Job
-	err = msgpack.NewDecoder(strings.NewReader(s)).Decode(&job)
-	if err != nil {
-		return nil, err
+	jobm := res.([]interface{})
+	jobs := make([]*Job, len(jobm))
+	for i, iface := range jobm {
+		var job Job
+		err := msgpack.NewDecoder(strings.NewReader(iface.(string))).Decode(&job)
+		if err != nil {
+			return nil, err
+		}
+		jobs[i] = &job
 	}
-	return &job, nil
+	return jobs, nil
 }
 
 func (q *redisQueue) Ack(job *Job, opt *AckOptions) error {
+	return q.BulkAck([]*Job{job}, opt)
+}
+
+func (q *redisQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
 	}
-	return q.ackScript.Run(q.client, nil,
-		opt.Namespace,
-		opt.QueueID,
-		job.ID,
-	).Err()
+	args := make([]interface{}, 2+len(jobs))
+	args[0] = opt.Namespace
+	args[1] = opt.QueueID
+	for i, job := range jobs {
+		args[2+i] = job.ID
+	}
+	return q.ackScript.Run(q.client, nil, args...).Err()
 }
 
-var _ MetricsExporter = (*redisQueue)(nil)
+var (
+	_ MetricsExporter = (*redisQueue)(nil)
+	_ bulkEnqueuer    = (*redisQueue)(nil)
+	_ bulkDequeuer    = (*redisQueue)(nil)
+)
 
 func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, error) {
 	err := opt.Validate()

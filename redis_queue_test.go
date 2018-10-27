@@ -174,7 +174,7 @@ func TestRedisQueueDequeueDeletedJob(t *testing.T) {
 		At:           job.CreatedAt,
 		InvisibleSec: 60,
 	})
-	require.Equal(t, redis.Nil, err)
+	require.Equal(t, ErrEmptyQueue, err)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
 		redis.ZRangeBy{

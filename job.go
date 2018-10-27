@@ -163,3 +163,12 @@ type Queue interface {
 	Enqueuer
 	Dequeuer
 }
+
+type bulkEnqueuer interface {
+	BulkEnqueue([]*Job, *EnqueueOptions) error
+}
+
+type bulkDequeuer interface {
+	BulkDequeue(int64, *DequeueOptions) ([]*Job, error)
+	BulkAck([]*Job, *AckOptions) error
+}
