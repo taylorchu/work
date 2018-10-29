@@ -24,6 +24,8 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local at = tonumber(ARGV[3])
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
+	local zadd_args = {"zadd", queue_key}
+
 	for i = 4,table.getn(ARGV),2 do
 		local job_id = ARGV[i]
 		local job = ARGV[i+1]
@@ -33,9 +35,10 @@ func NewRedisQueue(client *redis.Client) Queue {
 		redis.call("hset", job_key, "msgpack", job)
 
 		-- enqueue
-		redis.call("zadd", queue_key, at, job_key)
+		table.insert(zadd_args, at)
+		table.insert(zadd_args, job_key)
 	end
-	return redis.status_reply("queued")
+	return redis.call(unpack(zadd_args))
 	`)
 
 	dequeueScript := redis.NewScript(`
@@ -78,6 +81,8 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local queue_id = ARGV[2]
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
+	local zrem_args = {"zrem", queue_key}
+
 	for i = 3,table.getn(ARGV) do
 		local job_id = ARGV[i]
 		local job_key = table.concat({ns, "job", job_id}, ":")
@@ -86,10 +91,9 @@ func NewRedisQueue(client *redis.Client) Queue {
 		redis.call("del", job_key)
 
 		-- remove job from the queue
-		redis.call("zrem", queue_key, job_key)
+		table.insert(zrem_args, job_key)
 	end
-
-	return redis.status_reply("acked")
+	return redis.call(unpack(zrem_args))
 	`)
 
 	return &redisQueue{
@@ -108,6 +112,9 @@ func (q *redisQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
+	}
+	if len(jobs) == 0 {
+		return nil
 	}
 	args := make([]interface{}, 3+2*len(jobs))
 	args[0] = opt.Namespace
@@ -171,6 +178,9 @@ func (q *redisQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
+	}
+	if len(jobs) == 0 {
+		return nil
 	}
 	args := make([]interface{}, 2+len(jobs))
 	args[0] = opt.Namespace

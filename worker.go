@@ -124,62 +124,103 @@ func (w *Worker) Register(queueID string, h HandleFunc, opt *JobOptions) error {
 	if err != nil {
 		return err
 	}
-	hdr := handler{
+	w.handlerMap[queueID] = handler{
 		QueueID:    queueID,
 		HandleFunc: h,
 		JobOptions: *opt,
 	}
-	// add default middleware
-	hdr.JobOptions.DequeueMiddleware = append(hdr.JobOptions.DequeueMiddleware, idleWait(opt.IdleWait))
-	hdr.JobOptions.HandleMiddleware = append(hdr.JobOptions.HandleMiddleware, catchPanic, retry(w.queue))
-
-	w.handlerMap[queueID] = hdr
 	return nil
 }
 
 // Start starts the worker.
 func (w *Worker) Start() {
-	stop := make(chan struct{})
+	w.stop = make(chan struct{})
 	for _, h := range w.handlerMap {
 		for i := int64(0); i < h.JobOptions.NumGoroutines; i++ {
 			w.wg.Add(1)
-			go func(h handler) {
-				defer w.wg.Done()
-
-				dequeue := getDequeueFunc(w.queue)
-				for _, mw := range h.JobOptions.DequeueMiddleware {
-					dequeue = mw(dequeue)
-				}
-
-				handle := h.HandleFunc
-				for _, mw := range h.JobOptions.HandleMiddleware {
-					handle = mw(handle)
-				}
-
-				for {
-					select {
-					case <-stop:
-						return
-					default:
-						func() error {
-							opt := &DequeueOptions{
-								Namespace:    w.namespace,
-								QueueID:      h.QueueID,
-								At:           time.Now(),
-								InvisibleSec: int64(2 * h.JobOptions.MaxExecutionTime / time.Second),
-							}
-							job, err := dequeue(opt)
-							if err != nil {
-								return err
-							}
-							return handle(job, opt)
-						}()
-					}
-				}
-			}(h)
+			go w.start(h)
 		}
 	}
-	w.stop = stop
+}
+
+func (w *Worker) start(h handler) {
+	defer w.wg.Done()
+
+	dequeue := getDequeueFunc(w.queue)
+	for _, mw := range h.JobOptions.DequeueMiddleware {
+		dequeue = mw(dequeue)
+	}
+	dequeue = idleWait(h.JobOptions.IdleWait, w.stop)(dequeue)
+
+	handle := h.HandleFunc
+	for _, mw := range h.JobOptions.HandleMiddleware {
+		handle = mw(handle)
+	}
+	handle = catchPanic(handle)
+	handle = retry(w.queue)(handle)
+
+	// prepare bulk ack flush
+	var ackJobs []*Job
+	flush := func() error {
+		opt := &AckOptions{
+			Namespace: w.namespace,
+			QueueID:   h.QueueID,
+		}
+		bulkDeq, ok := w.queue.(bulkDequeuer)
+		if ok {
+			err := bulkDeq.BulkAck(ackJobs, opt)
+			if err != nil {
+				return err
+			}
+			ackJobs = nil
+			return nil
+		}
+		for _, job := range ackJobs {
+			err := w.queue.Ack(job, opt)
+			if err != nil {
+				return err
+			}
+		}
+		ackJobs = nil
+		return nil
+	}
+	defer flush()
+
+	const flushIntv = time.Second
+	flushTicker := time.NewTicker(flushIntv)
+	defer flushTicker.Stop()
+
+	for {
+		select {
+		case <-w.stop:
+			return
+		case <-flushTicker.C:
+			flush()
+		default:
+			func() error {
+				opt := &DequeueOptions{
+					Namespace:    w.namespace,
+					QueueID:      h.QueueID,
+					At:           time.Now(),
+					InvisibleSec: int64(2 * (h.JobOptions.MaxExecutionTime + flushIntv) / time.Second),
+				}
+				job, err := dequeue(opt)
+				if err != nil {
+					return err
+				}
+				err = handle(job, opt)
+				if err != nil {
+					return err
+				}
+				ackJobs = append(ackJobs, job)
+				if len(ackJobs) >= 1000 {
+					// prevent un-acked job count to be too large
+					flush()
+				}
+				return nil
+			}()
+		}
+	}
 }
 
 func getDequeueFunc(queue Queue) DequeueFunc {
@@ -238,13 +279,16 @@ func (w *Worker) Stop() {
 	w.wg.Wait()
 }
 
-func idleWait(d time.Duration) DequeueMiddleware {
+func idleWait(d time.Duration, stop <-chan struct{}) DequeueMiddleware {
 	return func(f DequeueFunc) DequeueFunc {
 		return func(opt *DequeueOptions) (*Job, error) {
 			job, err := f(opt)
 			if err != nil {
 				if err == ErrEmptyQueue {
-					time.Sleep(d)
+					select {
+					case <-time.After(d):
+					case <-stop:
+					}
 				}
 				return nil, err
 			}
@@ -280,10 +324,7 @@ func retry(queue Queue) HandleMiddleware {
 				})
 				return err
 			}
-			return queue.Ack(job, &AckOptions{
-				Namespace: opt.Namespace,
-				QueueID:   opt.QueueID,
-			})
+			return nil
 		}
 	}
 }
