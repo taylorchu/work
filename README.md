@@ -1,5 +1,9 @@
 # gocraft/work v2
 
+[![GoDoc](https://godoc.org/github.com/taylorchu/work?status.png)](https://godoc.org/github.com/taylorchu/work)
+[![Go Report Card](https://goreportcard.com/badge/github.com/taylorchu/work)](https://goreportcard.com/report/github.com/taylorchu/work)
+
+
 This is the in-progress repo for gocraft/work rewrite.
 
 ## Improvements
