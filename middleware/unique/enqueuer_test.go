@@ -17,6 +17,35 @@ func newRedisClient() *redis.Client {
 	})
 }
 
+func TestEnqueuerBypass(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(t, client.FlushAll().Err())
+
+	enq := Enqueuer(&EnqueuerOptions{
+		Client: client,
+		UniqueFunc: func(*work.Job, *work.EnqueueOptions) ([]byte, time.Duration, error) {
+			return nil, time.Hour, nil
+		},
+	})
+
+	var called int
+	h := enq(func(*work.Job, *work.EnqueueOptions) error {
+		called++
+		return nil
+	})
+	for i := 0; i < 3; i++ {
+		job := work.NewJob()
+		err := h(job, &work.EnqueueOptions{
+			Namespace: "n1",
+			QueueID:   "q1",
+			At:        job.CreatedAt,
+		})
+		require.NoError(t, err)
+	}
+	require.Equal(t, 3, called)
+}
+
 func TestEnqueuer(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
@@ -24,8 +53,8 @@ func TestEnqueuer(t *testing.T) {
 
 	enq := Enqueuer(&EnqueuerOptions{
 		Client: client,
-		UniqueFunc: func(*work.Job, *work.EnqueueOptions) ([]byte, time.Duration) {
-			return nil, time.Hour
+		UniqueFunc: func(*work.Job, *work.EnqueueOptions) ([]byte, time.Duration, error) {
+			return []byte("test"), time.Hour, nil
 		},
 	})
 
@@ -46,7 +75,7 @@ func TestEnqueuer(t *testing.T) {
 	require.Equal(t, 1, called)
 
 	for i := 0; i < 3; i++ {
-		require.NoError(t, client.Del("n1:unique:q1:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855").Err())
+		require.NoError(t, client.Del("n1:unique:q1:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08").Err())
 		job := work.NewJob()
 		err := h(job, &work.EnqueueOptions{
 			Namespace: "n1",
@@ -67,8 +96,8 @@ func BenchmarkEnqueuer(b *testing.B) {
 
 	enq := Enqueuer(&EnqueuerOptions{
 		Client: client,
-		UniqueFunc: func(job *work.Job, _ *work.EnqueueOptions) ([]byte, time.Duration) {
-			return []byte(job.ID), time.Hour
+		UniqueFunc: func(job *work.Job, _ *work.EnqueueOptions) ([]byte, time.Duration, error) {
+			return []byte(job.ID), time.Hour, nil
 		},
 	})
 
