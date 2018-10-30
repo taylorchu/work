@@ -17,6 +17,9 @@ type Job struct {
 	// UpdatedAt is when the job is last executed.
 	// UpdatedAt is set to the time when NewJob() is called initially.
 	UpdatedAt time.Time `msgpack:"updated_at"`
+	// EnqueuedAt is when the job will be executed next.
+	// EnqueuedAt is set to the time when NewJob() is called initially.
+	EnqueuedAt time.Time `msgpack:"enqueued_at"`
 
 	// Payload is raw bytes.
 	Payload []byte `msgpack:"payload"`
@@ -47,16 +50,16 @@ func NewJob() *Job {
 	id := uuid.New().String()
 	now := time.Now().Truncate(time.Second)
 	return &Job{
-		ID:        id,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:         id,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+		EnqueuedAt: now,
 	}
 }
 
 // Delay creates a job that can be executed in future.
 func (j Job) Delay(d time.Duration) *Job {
-	j.CreatedAt = j.CreatedAt.Add(d)
-	j.UpdatedAt = j.CreatedAt
+	j.EnqueuedAt = j.EnqueuedAt.Add(d)
 	return &j
 }
 
@@ -74,9 +77,6 @@ type EnqueueOptions struct {
 	Namespace string
 	// QueueID is the id of a queue.
 	QueueID string
-	// At is the current time of the enqueuer.
-	// Use this to delay job execution.
-	At time.Time
 }
 
 // Validate validates EnqueueOptions.
@@ -86,9 +86,6 @@ func (opt *EnqueueOptions) Validate() error {
 	}
 	if opt.QueueID == "" {
 		return ErrEmptyQueueID
-	}
-	if opt.At.IsZero() {
-		return ErrAt
 	}
 	return nil
 }

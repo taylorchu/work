@@ -44,7 +44,7 @@ func EnqueueFuncLogger(f work.EnqueueFunc) work.EnqueueFunc {
 			logger.WithError(err).Error("Job failed to enqueue.")
 			return err
 		}
-		logger.WithField("enqueued_at", opt.At).Info("Job enqueued.")
+		logger.WithField("enqueued_at", job.EnqueuedAt).Info("Job enqueued.")
 		return nil
 	}
 }

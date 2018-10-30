@@ -21,14 +21,14 @@ func NewRedisQueue(client *redis.Client) Queue {
 	enqueueScript := redis.NewScript(`
 	local ns = ARGV[1]
 	local queue_id = ARGV[2]
-	local at = tonumber(ARGV[3])
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
 	local zadd_args = {"zadd", queue_key}
 
-	for i = 4,table.getn(ARGV),2 do
-		local job_id = ARGV[i]
-		local job = ARGV[i+1]
+	for i = 3,table.getn(ARGV),3 do
+		local at = tonumber(ARGV[i])
+		local job_id = ARGV[i+1]
+		local job = ARGV[i+2]
 		local job_key = table.concat({ns, "job", job_id}, ":")
 
 		-- update job fields
@@ -116,17 +116,17 @@ func (q *redisQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 	if len(jobs) == 0 {
 		return nil
 	}
-	args := make([]interface{}, 3+2*len(jobs))
+	args := make([]interface{}, 2+3*len(jobs))
 	args[0] = opt.Namespace
 	args[1] = opt.QueueID
-	args[2] = opt.At.Unix()
 	for i, job := range jobs {
 		jobm, err := msgpack.Marshal(job)
 		if err != nil {
 			return err
 		}
-		args[3+2*i] = job.ID
-		args[3+2*i+1] = jobm
+		args[2+3*i] = job.EnqueuedAt.Unix()
+		args[2+3*i+1] = job.ID
+		args[2+3*i+2] = jobm
 	}
 	return q.enqueueScript.Run(q.client, nil, args...).Err()
 }

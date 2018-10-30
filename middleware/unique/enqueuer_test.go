@@ -39,7 +39,6 @@ func TestEnqueuerBypass(t *testing.T) {
 		err := h(job, &work.EnqueueOptions{
 			Namespace: "n1",
 			QueueID:   "q1",
-			At:        job.CreatedAt,
 		})
 		require.NoError(t, err)
 	}
@@ -68,7 +67,6 @@ func TestEnqueuer(t *testing.T) {
 		err := h(job, &work.EnqueueOptions{
 			Namespace: "n1",
 			QueueID:   "q1",
-			At:        job.CreatedAt,
 		})
 		require.NoError(t, err)
 	}
@@ -80,7 +78,6 @@ func TestEnqueuer(t *testing.T) {
 		err := h(job, &work.EnqueueOptions{
 			Namespace: "n1",
 			QueueID:   "q1",
-			At:        job.CreatedAt,
 		})
 		require.NoError(t, err)
 		require.Equal(t, i+2, called)
@@ -113,7 +110,6 @@ func BenchmarkEnqueuer(b *testing.B) {
 		h(job, &work.EnqueueOptions{
 			Namespace: "n1",
 			QueueID:   "q1",
-			At:        job.CreatedAt,
 		})
 	}
 	b.StopTimer()

@@ -120,7 +120,7 @@ var (
 )
 
 // Enqueue enqueues a job.
-func (w *Worker) Enqueue(queueID string, job *Job) error {
+func (w *Worker) Enqueue(queueID string, jobs ...*Job) error {
 	h, ok := w.handlerMap[queueID]
 	if !ok {
 		return ErrQueueNotFound
@@ -129,11 +129,17 @@ func (w *Worker) Enqueue(queueID string, job *Job) error {
 	for _, mw := range h.JobOptions.EnqueueMiddleware {
 		enqueue = mw(enqueue)
 	}
-	return enqueue(job, &EnqueueOptions{
+	opt := &EnqueueOptions{
 		Namespace: w.namespace,
 		QueueID:   queueID,
-		At:        job.CreatedAt,
-	})
+	}
+	for _, job := range jobs {
+		err := enqueue(job, opt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Register adds handler for a queue.
@@ -335,10 +341,10 @@ func retry(queue Queue) HandleMiddleware {
 				job.Retries++
 				job.LastError = err.Error()
 				job.UpdatedAt = now
+				job.EnqueuedAt = now.Add(time.Duration(job.Retries*opt.InvisibleSec) * time.Second)
 				queue.Enqueue(job, &EnqueueOptions{
 					Namespace: opt.Namespace,
 					QueueID:   opt.QueueID,
-					At:        now.Add(time.Duration(job.Retries*opt.InvisibleSec) * time.Second),
 				})
 				return err
 			}

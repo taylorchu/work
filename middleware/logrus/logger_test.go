@@ -33,7 +33,6 @@ func TestEnqueueFuncLogger(t *testing.T) {
 	opt := &work.EnqueueOptions{
 		Namespace: "n1",
 		QueueID:   "q1",
-		At:        job.CreatedAt,
 	}
 	h := EnqueueFuncLogger(func(*work.Job, *work.EnqueueOptions) error {
 		return nil

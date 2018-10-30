@@ -24,6 +24,7 @@ func TestAfter(t *testing.T) {
 	require.Error(t, err)
 	require.NotEqual(t, work.ErrUnrecoverable, err)
 
-	err = h(job.Delay(-time.Hour), opt)
+	job.CreatedAt = job.CreatedAt.Add(-time.Hour)
+	err = h(job, opt)
 	require.Equal(t, work.ErrUnrecoverable, err)
 }
