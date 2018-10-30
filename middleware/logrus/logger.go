@@ -23,6 +23,7 @@ func HandleFuncLogger(f work.HandleFunc) work.HandleFunc {
 				"retries":    job.Retries,
 				"created_at": job.CreatedAt,
 				"updated_at": job.UpdatedAt,
+				"retry_at":   job.EnqueuedAt,
 			}).WithError(err).Error("Job failed.")
 			return err
 		}
