@@ -63,6 +63,15 @@ func (j Job) Delay(d time.Duration) *Job {
 	return &j
 }
 
+// WithPayload adds payload to the job.
+func (j Job) WithPayload(v interface{}) (*Job, error) {
+	err := j.MarshalPayload(v)
+	if err != nil {
+		return nil, err
+	}
+	return &j, nil
+}
+
 // options validation errors
 var (
 	ErrEmptyNamespace = errors.New("work: empty namespace")
