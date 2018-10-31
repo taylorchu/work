@@ -23,22 +23,22 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local queue_id = ARGV[2]
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
-	local zadd_args = {"zadd", queue_key}
+	local zadd_args = {}
 
 	for i = 3,table.getn(ARGV),3 do
 		local at = tonumber(ARGV[i])
 		local job_id = ARGV[i+1]
-		local job = ARGV[i+2]
+		local jobm = ARGV[i+2]
 		local job_key = table.concat({ns, "job", job_id}, ":")
 
 		-- update job fields
-		redis.call("hset", job_key, "msgpack", job)
+		redis.call("hset", job_key, "msgpack", jobm)
 
 		-- enqueue
 		table.insert(zadd_args, at)
 		table.insert(zadd_args, job_key)
 	end
-	return redis.call(unpack(zadd_args))
+	return redis.call("zadd", queue_key, unpack(zadd_args))
 	`)
 
 	dequeueScript := redis.NewScript(`
@@ -50,30 +50,37 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
 	-- get job
-	local jobs = redis.call("zrangebyscore", queue_key, "-inf", at, "limit", 0, count)
+	local job_keys = redis.call("zrangebyscore", queue_key, "-inf", at, "limit", 0, count)
 
-	local jobm = {}
-	for idx, job_key in pairs(jobs) do
-		local resp = redis.call("hgetall", job_key)
-		local job = {}
-		for i = 1,table.getn(resp),2 do
-			job[resp[i]] = resp[i+1]
-		end
+	local ret = {}
+
+	local zadd_args = {}
+	local zrem_args = {}
+
+	for i, job_key in pairs(job_keys) do
+		local jobm = redis.call("hget", job_key, "msgpack")
 
 		-- job is deleted unexpectedly
-		if job.msgpack == nil then
-			redis.call("zrem", queue_key, job_key)
+		if jobm == false then
+			table.insert(zrem_args, job_key)
 		else
 			-- mark it as "processing" by increasing the score
-			redis.call("zincrby", queue_key, invis_sec, job_key)
-			table.insert(jobm, job.msgpack)
+			table.insert(zadd_args, at + invis_sec)
+			table.insert(zadd_args, job_key)
+			table.insert(ret, jobm)
 		end
 	end
+	if table.getn(zadd_args) > 0 then
+		redis.call("zadd", queue_key, "XX", unpack(zadd_args))
+	end
+	if table.getn(zrem_args) > 0 then
+		redis.call("zrem", queue_key, unpack(zrem_args))
+	end
 
-	if table.getn(jobm) == 0 then
+	if table.getn(ret) == 0 then
 		return nil
 	end
-	return jobm
+	return ret
 	`)
 
 	ackScript := redis.NewScript(`
@@ -81,19 +88,21 @@ func NewRedisQueue(client *redis.Client) Queue {
 	local queue_id = ARGV[2]
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
-	local zrem_args = {"zrem", queue_key}
+	local zrem_args = {}
+	local del_args = {}
 
 	for i = 3,table.getn(ARGV) do
 		local job_id = ARGV[i]
 		local job_key = table.concat({ns, "job", job_id}, ":")
 
 		-- delete job fields
-		redis.call("del", job_key)
+		table.insert(del_args, job_key)
 
 		-- remove job from the queue
 		table.insert(zrem_args, job_key)
 	end
-	return redis.call(unpack(zrem_args))
+	redis.call("del", unpack(del_args))
+	return redis.call("zrem", queue_key, unpack(zrem_args))
 	`)
 
 	return &redisQueue{
