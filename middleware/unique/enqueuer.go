@@ -9,12 +9,15 @@ import (
 	"github.com/taylorchu/work"
 )
 
+// Func defines job uniqueness.
+type Func func(*work.Job, *work.EnqueueOptions) ([]byte, time.Duration, error)
+
 // EnqueuerOptions defines job unique key generation.
 type EnqueuerOptions struct {
 	Client *redis.Client
 	// If returned []byte is nil, uniqness check is bypassed.
 	// Returned time.Duration controls how long the unique key exists.
-	UniqueFunc func(*work.Job, *work.EnqueueOptions) ([]byte, time.Duration, error)
+	UniqueFunc Func
 }
 
 // Enqueuer uses UniqueFunc to ensure job uniqueness in a period.
