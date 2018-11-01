@@ -63,19 +63,12 @@ type JobOptions struct {
 	NumGoroutines    int64
 
 	DequeueMiddleware []DequeueMiddleware
-	EnqueueMiddleware []EnqueueMiddleware
 	HandleMiddleware  []HandleMiddleware
 }
 
 // AddDequeueMiddleware adds DequeueMiddleware.
 func (opt *JobOptions) AddDequeueMiddleware(mw DequeueMiddleware) *JobOptions {
 	opt.DequeueMiddleware = append(opt.DequeueMiddleware, mw)
-	return opt
-}
-
-// AddEnqueueMiddleware adds EnqueueMiddleware.
-func (opt *JobOptions) AddEnqueueMiddleware(mw EnqueueMiddleware) *JobOptions {
-	opt.EnqueueMiddleware = append(opt.EnqueueMiddleware, mw)
 	return opt
 }
 
@@ -118,29 +111,6 @@ var (
 	// ErrUnsupported is returned if it is not implemented.
 	ErrUnsupported = errors.New("work: unsupported")
 )
-
-// Enqueue enqueues a job.
-func (w *Worker) Enqueue(queueID string, jobs ...*Job) error {
-	h, ok := w.handlerMap[queueID]
-	if !ok {
-		return ErrQueueNotFound
-	}
-	enqueue := w.queue.Enqueue
-	for _, mw := range h.JobOptions.EnqueueMiddleware {
-		enqueue = mw(enqueue)
-	}
-	opt := &EnqueueOptions{
-		Namespace: w.namespace,
-		QueueID:   queueID,
-	}
-	for _, job := range jobs {
-		err := enqueue(job, opt)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // Register adds handler for a queue.
 func (w *Worker) Register(queueID string, h HandleFunc, opt *JobOptions) error {

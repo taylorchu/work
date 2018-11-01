@@ -139,7 +139,10 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		err := job.MarshalPayload(message{Text: "test1"})
 		require.NoError(t, err)
 
-		err = w.Enqueue("test1", job)
+		err = w.queue.Enqueue(job, &EnqueueOptions{
+			Namespace: "ns1",
+			QueueID:   "test1",
+		})
 		require.NoError(t, err)
 	}
 
@@ -148,7 +151,10 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		err := job.MarshalPayload(message{Text: "test2"})
 		require.NoError(t, err)
 
-		err = w.Enqueue("test2", job)
+		err = w.queue.Enqueue(job, &EnqueueOptions{
+			Namespace: "ns1",
+			QueueID:   "test2",
+		})
 		require.NoError(t, err)
 	}
 
@@ -223,7 +229,10 @@ func TestWorkerRunJob(t *testing.T) {
 		err := job.MarshalPayload(message{Text: "hello"})
 		require.NoError(t, err)
 
-		err = w.Enqueue("success", job)
+		err = w.queue.Enqueue(job, &EnqueueOptions{
+			Namespace: "ns1",
+			QueueID:   "success",
+		})
 		require.NoError(t, err)
 	}
 
@@ -245,7 +254,10 @@ func TestWorkerRunJob(t *testing.T) {
 		err := job.MarshalPayload(message{Text: "hello"})
 		require.NoError(t, err)
 
-		err = w.Enqueue("failure", job)
+		err = w.queue.Enqueue(job, &EnqueueOptions{
+			Namespace: "ns1",
+			QueueID:   "failure",
+		})
 		require.NoError(t, err)
 	}
 
@@ -279,7 +291,10 @@ func TestWorkerRunJob(t *testing.T) {
 		err := job.MarshalPayload(message{Text: "hello"})
 		require.NoError(t, err)
 
-		err = w.Enqueue("panic", job)
+		err = w.queue.Enqueue(job, &EnqueueOptions{
+			Namespace: "ns1",
+			QueueID:   "panic",
+		})
 		require.NoError(t, err)
 	}
 
