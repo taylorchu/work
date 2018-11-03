@@ -5,8 +5,8 @@ import (
 	"github.com/taylorchu/work"
 )
 
-// ConcurrencyOptions defines how many jobs in the same queue can be running at the same time.
-type ConcurrencyOptions struct {
+// DequeuerOptions defines how many jobs in the same queue can be running at the same time.
+type DequeuerOptions struct {
 	Client   *redis.Client
 	WorkerID string
 	Max      int64
@@ -14,8 +14,8 @@ type ConcurrencyOptions struct {
 	disableUnlock bool // for testing
 }
 
-// Concurrency limits running job count from a queue.
-func Concurrency(copt *ConcurrencyOptions) work.DequeueMiddleware {
+// Dequeuer limits running job count from a queue.
+func Dequeuer(copt *DequeuerOptions) work.DequeueMiddleware {
 	lockScript := redis.NewScript(`
 	local ns = ARGV[1]
 	local queue_id = ARGV[2]

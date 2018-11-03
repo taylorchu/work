@@ -18,7 +18,7 @@ func newRedisClient() *redis.Client {
 	})
 }
 
-func TestConcurrency(t *testing.T) {
+func TestDequeuer(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
@@ -36,7 +36,7 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	for i := 0; i < 3; i++ {
-		deq := Concurrency(&ConcurrencyOptions{
+		deq := Dequeuer(&DequeuerOptions{
 			Client:   client,
 			Max:      2,
 			WorkerID: fmt.Sprintf("w%d", i),
@@ -50,7 +50,7 @@ func TestConcurrency(t *testing.T) {
 	// worker 0, 1 get the lock
 	// worker 2 is locked
 	for i := 0; i < 3; i++ {
-		deq := Concurrency(&ConcurrencyOptions{
+		deq := Dequeuer(&DequeuerOptions{
 			Client:        client,
 			Max:           2,
 			WorkerID:      fmt.Sprintf("w%d", i),
@@ -83,7 +83,7 @@ func TestConcurrency(t *testing.T) {
 	optLater.At = opt.At.Add(10 * time.Second)
 	// worker 0 is locked already
 	for i := 0; i < 3; i++ {
-		deq := Concurrency(&ConcurrencyOptions{
+		deq := Dequeuer(&DequeuerOptions{
 			Client:        client,
 			Max:           2,
 			WorkerID:      "w0",
@@ -109,7 +109,7 @@ func TestConcurrency(t *testing.T) {
 	optExpired := *opt
 	optExpired.At = opt.At.Add(60 * time.Second)
 	for i := 3; i < 6; i++ {
-		deq := Concurrency(&ConcurrencyOptions{
+		deq := Dequeuer(&DequeuerOptions{
 			Client:        client,
 			Max:           2,
 			WorkerID:      fmt.Sprintf("w%d", i),
@@ -158,7 +158,7 @@ func BenchmarkConcurrency(b *testing.B) {
 
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		deq := Concurrency(&ConcurrencyOptions{
+		deq := Dequeuer(&DequeuerOptions{
 			Client:   client,
 			Max:      2,
 			WorkerID: fmt.Sprintf("w%d", n),
