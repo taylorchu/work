@@ -34,7 +34,7 @@ func TestHandleFuncMetrics(t *testing.T) {
 
 	for _, m := range []string{
 		`work_job_executed_total{`,
-		`work_job_execution_time_ms{`,
+		`work_job_execution_time_seconds_bucket{`,
 	} {
 		require.Contains(t, r.Body.String(), m)
 	}

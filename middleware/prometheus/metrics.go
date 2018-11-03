@@ -8,10 +8,10 @@ import (
 )
 
 var (
-	jobExecutionTimeMs = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	jobExecutionTimeSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: "work",
-			Name:      "job_execution_time_ms",
+			Name:      "job_execution_time_seconds",
 			Help:      "Time for a job to finish successfully",
 		},
 		[]string{"namespace", "queue"},
@@ -51,7 +51,7 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(jobExecutionTimeMs)
+	prometheus.MustRegister(jobExecutionTimeSeconds)
 	prometheus.MustRegister(jobExecutedTotal)
 
 	prometheus.MustRegister(jobEnqueuedTotal)
@@ -70,7 +70,7 @@ func HandleFuncMetrics(f work.HandleFunc) work.HandleFunc {
 			return err
 		}
 		jobExecutedTotal.WithLabelValues(opt.Namespace, opt.QueueID, "success").Inc()
-		jobExecutionTimeMs.WithLabelValues(opt.Namespace, opt.QueueID).Set(float64(time.Since(startTime).Nanoseconds()) / 1000000)
+		jobExecutionTimeSeconds.WithLabelValues(opt.Namespace, opt.QueueID).Observe(time.Since(startTime).Seconds())
 		return nil
 	}
 }
