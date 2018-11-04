@@ -1,4 +1,4 @@
-package limit
+package concurrent
 
 import (
 	"github.com/go-redis/redis"
