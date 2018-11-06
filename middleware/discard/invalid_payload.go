@@ -3,6 +3,7 @@ package discard
 import (
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/taylorchu/work"
 )
 
@@ -11,7 +12,8 @@ func InvalidPayload(f work.HandleFunc) work.HandleFunc {
 	return func(job *work.Job, opt *work.DequeueOptions) error {
 		err := f(job, opt)
 		if err != nil {
-			if strings.HasPrefix(err.Error(), "msgpack:") {
+			cerr := errors.Cause(err)
+			if strings.HasPrefix(cerr.Error(), "msgpack:") {
 				return work.ErrUnrecoverable
 			}
 			return err
