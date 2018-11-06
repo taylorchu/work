@@ -47,7 +47,7 @@ func (j *Job) MarshalPayload(v interface{}) error {
 
 // NewJob creates a job.
 func NewJob() *Job {
-	id := uuid.New().String()
+	id := uuid.Must(uuid.NewUUID()).String()
 	now := time.Now().Truncate(time.Second)
 	return &Job{
 		ID:         id,
