@@ -39,7 +39,7 @@ func TestDequeuer(t *testing.T) {
 		deq := Dequeuer(&DequeuerOptions{
 			Client:   client,
 			Max:      2,
-			WorkerID: fmt.Sprintf("w%d", i),
+			workerID: fmt.Sprintf("w%d", i),
 		})
 		_, err := deq(h)(opt)
 
@@ -53,7 +53,7 @@ func TestDequeuer(t *testing.T) {
 		deq := Dequeuer(&DequeuerOptions{
 			Client:        client,
 			Max:           2,
-			WorkerID:      fmt.Sprintf("w%d", i),
+			workerID:      fmt.Sprintf("w%d", i),
 			disableUnlock: true,
 		})
 		_, err := deq(h)(opt)
@@ -86,7 +86,7 @@ func TestDequeuer(t *testing.T) {
 		deq := Dequeuer(&DequeuerOptions{
 			Client:        client,
 			Max:           2,
-			WorkerID:      "w0",
+			workerID:      "w0",
 			disableUnlock: true,
 		})
 		_, err := deq(h)(&optLater)
@@ -112,7 +112,7 @@ func TestDequeuer(t *testing.T) {
 		deq := Dequeuer(&DequeuerOptions{
 			Client:        client,
 			Max:           2,
-			WorkerID:      fmt.Sprintf("w%d", i),
+			workerID:      fmt.Sprintf("w%d", i),
 			disableUnlock: true,
 		})
 		_, err := deq(h)(&optExpired)
@@ -150,20 +150,19 @@ func BenchmarkConcurrency(b *testing.B) {
 		At:           time.Now(),
 		InvisibleSec: 60,
 	}
+	deq := Dequeuer(&DequeuerOptions{
+		Client: client,
+		Max:    1,
+	})
 	var called int
-	h := func(*work.DequeueOptions) (*work.Job, error) {
+	h := deq(func(*work.DequeueOptions) (*work.Job, error) {
 		called++
 		return work.NewJob(), nil
-	}
+	})
 
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		deq := Dequeuer(&DequeuerOptions{
-			Client:   client,
-			Max:      2,
-			WorkerID: fmt.Sprintf("w%d", n),
-		})
-		deq(h)(opt)
+		h(opt)
 	}
 	b.StopTimer()
 	require.Equal(b, b.N, called)

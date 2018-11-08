@@ -2,16 +2,17 @@ package concurrent
 
 import (
 	"github.com/go-redis/redis"
+	"github.com/google/uuid"
 	"github.com/taylorchu/work"
 )
 
 // DequeuerOptions defines how many jobs in the same queue can be running at the same time.
 type DequeuerOptions struct {
-	Client   *redis.Client
-	WorkerID string
-	Max      int64
+	Client *redis.Client
+	Max    int64
 
-	disableUnlock bool // for testing
+	workerID      string // for testing
+	disableUnlock bool   // for testing
 }
 
 // Dequeuer limits running job count from a queue.
@@ -45,6 +46,10 @@ func Dequeuer(copt *DequeuerOptions) work.DequeueMiddleware {
 	return redis.call("zrem", lock_key, worker_id)
 	`)
 	return func(f work.DequeueFunc) work.DequeueFunc {
+		workerID := copt.workerID
+		if workerID == "" {
+			workerID = uuid.New().String()
+		}
 		return func(opt *work.DequeueOptions) (*work.Job, error) {
 			err := opt.Validate()
 			if err != nil {
@@ -55,7 +60,7 @@ func Dequeuer(copt *DequeuerOptions) work.DequeueMiddleware {
 				opt.QueueID,
 				opt.At.Unix(),
 				opt.InvisibleSec,
-				copt.WorkerID,
+				workerID,
 				copt.Max,
 			).Int64()
 			if err != nil {
@@ -68,7 +73,7 @@ func Dequeuer(copt *DequeuerOptions) work.DequeueMiddleware {
 				defer unlockScript.Run(copt.Client, nil,
 					opt.Namespace,
 					opt.QueueID,
-					copt.WorkerID,
+					workerID,
 				)
 			}
 			return f(opt)
