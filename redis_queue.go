@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/go-redis/redis"
-	"github.com/vmihailenco/msgpack"
 )
 
 type redisQueue struct {
@@ -131,7 +130,7 @@ func (q *redisQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 	args[0] = opt.Namespace
 	args[1] = opt.QueueID
 	for i, job := range jobs {
-		jobm, err := msgpack.Marshal(job)
+		jobm, err := marshal(job)
 		if err != nil {
 			return err
 		}
@@ -172,7 +171,7 @@ func (q *redisQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, erro
 	jobs := make([]*Job, len(jobm))
 	for i, iface := range jobm {
 		var job Job
-		err := msgpack.NewDecoder(strings.NewReader(iface.(string))).Decode(&job)
+		err := unmarshal(strings.NewReader(iface.(string)), &job)
 		if err != nil {
 			return nil, err
 		}

@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack"
 )
 
 func newRedisClient() *redis.Client {
@@ -42,7 +41,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 
 	h, err := client.HGetAll(jobKey).Result()
 	require.NoError(t, err)
-	jobm, err := msgpack.Marshal(job)
+	jobm, err := marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
 		"msgpack": string(jobm),
@@ -128,7 +127,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 
 	h, err := client.HGetAll(jobKey).Result()
 	require.NoError(t, err)
-	jobm, err := msgpack.Marshal(job)
+	jobm, err := marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
 		"msgpack": string(jobm),
@@ -179,7 +178,7 @@ func TestRedisQueueDequeueDeletedJob(t *testing.T) {
 
 	h, err := client.HGetAll(jobKey).Result()
 	require.NoError(t, err)
-	jobm, err := msgpack.Marshal(job)
+	jobm, err := marshal(job)
 	require.NoError(t, err)
 	require.Equal(t, map[string]string{
 		"msgpack": string(jobm),

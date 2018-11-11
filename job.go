@@ -1,11 +1,11 @@
 package work
 
 import (
+	"bytes"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/vmihailenco/msgpack"
 )
 
 // Job is a single unit of work.
@@ -32,12 +32,12 @@ type Job struct {
 
 // UnmarshalPayload decodes the payload into a variable.
 func (j *Job) UnmarshalPayload(v interface{}) error {
-	return msgpack.Unmarshal(j.Payload, v)
+	return unmarshal(bytes.NewReader(j.Payload), v)
 }
 
 // MarshalPayload encodes a variable into the payload.
 func (j *Job) MarshalPayload(v interface{}) error {
-	b, err := msgpack.Marshal(v)
+	b, err := marshal(v)
 	if err != nil {
 		return err
 	}
