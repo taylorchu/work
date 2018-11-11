@@ -77,7 +77,7 @@ var (
 	ErrEmptyNamespace = errors.New("work: empty namespace")
 	ErrEmptyQueueID   = errors.New("work: empty queue id")
 	ErrAt             = errors.New("work: at should not be zero")
-	ErrInvisibleSec   = errors.New("work: invisible sec should be > 0")
+	ErrInvisibleSec   = errors.New("work: invisible sec should be >= 0")
 )
 
 // EnqueueOptions specifies how a job is enqueued.
@@ -129,7 +129,7 @@ func (opt *DequeueOptions) Validate() error {
 	if opt.At.IsZero() {
 		return ErrAt
 	}
-	if opt.InvisibleSec <= 0 {
+	if opt.InvisibleSec < 0 {
 		return ErrInvisibleSec
 	}
 	return nil

@@ -64,9 +64,11 @@ func NewRedisQueue(client *redis.Client) Queue {
 		if jobm == false then
 			table.insert(zrem_args, job_key)
 		else
-			-- mark it as "processing" by increasing the score
-			table.insert(zadd_args, at + invis_sec)
-			table.insert(zadd_args, job_key)
+			if invis_sec > 0 then
+				-- mark it as "processing" by increasing the score
+				table.insert(zadd_args, at + invis_sec)
+				table.insert(zadd_args, job_key)
+			end
 			table.insert(ret, jobm)
 		end
 	end
