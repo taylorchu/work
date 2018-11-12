@@ -23,7 +23,7 @@ func TestWorkerStartStop(t *testing.T) {
 		func(*Job, *DequeueOptions) error { return nil },
 		&JobOptions{
 			MaxExecutionTime: time.Second,
-			IdleWait:         10 * time.Millisecond,
+			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
 	)
@@ -48,7 +48,7 @@ func TestWorkerExportMetrics(t *testing.T) {
 		func(*Job, *DequeueOptions) error { return nil },
 		&JobOptions{
 			MaxExecutionTime: time.Second,
-			IdleWait:         10 * time.Millisecond,
+			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
 	)
@@ -65,7 +65,8 @@ func waitEmpty(client *redis.Client, key string, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
 
-	ticker := time.NewTicker(10 * time.Millisecond)
+	const tickIntv = 10 * time.Millisecond
+	ticker := time.NewTicker(tickIntv)
 	defer ticker.Stop()
 
 	for {
@@ -82,6 +83,7 @@ func waitEmpty(client *redis.Client, key string, timeout time.Duration) error {
 				return err
 			}
 			if len(z) == 0 {
+				time.Sleep(tickIntv)
 				return nil
 			}
 		}
@@ -112,7 +114,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		},
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         10 * time.Millisecond,
+			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
 	)
@@ -128,7 +130,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		},
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         10 * time.Millisecond,
+			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
 	)
@@ -195,7 +197,7 @@ func TestWorkerRunJob(t *testing.T) {
 		func(*Job, *DequeueOptions) error { return nil },
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         10 * time.Millisecond,
+			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
 	)
@@ -204,7 +206,7 @@ func TestWorkerRunJob(t *testing.T) {
 		func(*Job, *DequeueOptions) error { return errors.New("no reason") },
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         10 * time.Millisecond,
+			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
 	)
@@ -215,7 +217,7 @@ func TestWorkerRunJob(t *testing.T) {
 		},
 		&JobOptions{
 			MaxExecutionTime: time.Minute,
-			IdleWait:         10 * time.Millisecond,
+			IdleWait:         time.Second,
 			NumGoroutines:    2,
 		},
 	)

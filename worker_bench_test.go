@@ -31,7 +31,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 				wp := work.NewWorkerPoolWithOptions(
 					struct{}{}, 1, "ns1", pool,
 					work.WorkerPoolOptions{
-						SleepBackoffs: []int64{10, 10, 10, 10, 10},
+						SleepBackoffs: []int64{1000},
 					},
 				)
 
@@ -72,7 +72,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 					},
 					&JobOptions{
 						MaxExecutionTime: time.Minute,
-						IdleWait:         10 * time.Millisecond,
+						IdleWait:         time.Second,
 						NumGoroutines:    1,
 					},
 				)
