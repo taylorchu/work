@@ -383,5 +383,6 @@ func TestRetry(t *testing.T) {
 	t.Log("delay", delays)
 	for i := 1; i < len(delays); i++ {
 		require.True(t, delays[i] > delays[i-1])
+		require.True(t, delays[i] > opt.InvisibleSec)
 	}
 }
