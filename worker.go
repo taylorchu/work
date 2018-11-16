@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/cenkalti/backoff"
 )
 
 // DequeueFunc generates a job.
@@ -311,7 +313,18 @@ func retry(queue Queue) HandleMiddleware {
 				job.Retries++
 				job.LastError = err.Error()
 				job.UpdatedAt = now
-				job.EnqueuedAt = now.Add(time.Duration(job.Retries*opt.InvisibleSec) * time.Second)
+
+				b := backoff.NewExponentialBackOff()
+				b.InitialInterval = time.Duration(opt.InvisibleSec) * time.Second
+				b.MaxInterval = 24 * time.Hour
+				b.RandomizationFactor = 0.1
+				b.Reset()
+
+				var next time.Duration
+				for i := int64(0); i < job.Retries; i++ {
+					next = b.NextBackOff()
+				}
+				job.EnqueuedAt = now.Add(next)
 				queue.Enqueue(job, &EnqueueOptions{
 					Namespace: opt.Namespace,
 					QueueID:   opt.QueueID,

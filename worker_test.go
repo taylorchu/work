@@ -325,3 +325,63 @@ func TestWorkerRunJob(t *testing.T) {
 		require.Equal(t, "unexpected", job.LastError)
 	}
 }
+
+func TestRetry(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(t, client.FlushAll().Err())
+
+	job := NewJob()
+	opt := &DequeueOptions{
+		Namespace:    "ns1",
+		QueueID:      "q1",
+		InvisibleSec: 10,
+	}
+	retrier := retry(NewRedisQueue(client))
+	h := retrier(func(*Job, *DequeueOptions) error {
+		return ErrUnrecoverable
+	})
+	err := h(job, opt)
+	require.NoError(t, err)
+
+	require.EqualValues(t, 0, job.Retries)
+	require.Equal(t, "", job.LastError)
+
+	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
+		redis.ZRangeBy{
+			Min: "-inf",
+			Max: "+inf",
+		}).Result()
+	require.NoError(t, err)
+	require.Len(t, z, 0)
+
+	var delays []int64
+	for i := 1; i <= 10; i++ {
+		retryErr := fmt.Errorf("error %d", i)
+		h = retrier(func(*Job, *DequeueOptions) error {
+			return retryErr
+		})
+		err = h(job, opt)
+		require.Error(t, err)
+		require.Equal(t, retryErr, err)
+
+		require.EqualValues(t, i, job.Retries)
+		require.Equal(t, retryErr.Error(), job.LastError)
+
+		z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
+			redis.ZRangeBy{
+				Min: "-inf",
+				Max: "+inf",
+			}).Result()
+		require.NoError(t, err)
+		require.Len(t, z, 1)
+		require.EqualValues(t, job.EnqueuedAt.Unix(), z[0].Score)
+
+		delays = append(delays, job.EnqueuedAt.Unix()-time.Now().Unix())
+	}
+
+	t.Log("delay", delays)
+	for i := 1; i < len(delays); i++ {
+		require.True(t, delays[i] > delays[i-1])
+	}
+}
