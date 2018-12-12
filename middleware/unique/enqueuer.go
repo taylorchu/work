@@ -2,6 +2,7 @@ package unique
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"time"
 
@@ -20,6 +21,10 @@ type EnqueuerOptions struct {
 	UniqueFunc Func
 }
 
+var (
+	ErrDedupDuration = errors.New("work: dudup duration should be > 0")
+)
+
 // Enqueuer uses UniqueFunc to ensure job uniqueness in a period.
 func Enqueuer(eopt *EnqueuerOptions) work.EnqueueMiddleware {
 	return func(f work.EnqueueFunc) work.EnqueueFunc {
@@ -31,6 +36,10 @@ func Enqueuer(eopt *EnqueuerOptions) work.EnqueueMiddleware {
 			if b == nil {
 				return f(job, opt)
 			}
+			if expireIn <= 0 {
+				return ErrDedupDuration
+			}
+
 			h := sha256.New()
 			_, err = h.Write(b)
 			if err != nil {
