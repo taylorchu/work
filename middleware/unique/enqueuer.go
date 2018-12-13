@@ -22,7 +22,7 @@ type EnqueuerOptions struct {
 }
 
 var (
-	ErrDedupDuration = errors.New("work: dudup duration should be > 0")
+	ErrDedupDuration = errors.New("work: unique duration should be > 0")
 )
 
 // Enqueuer uses UniqueFunc to ensure job uniqueness in a period.
