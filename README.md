@@ -3,6 +3,7 @@
 [![GoDoc](https://godoc.org/github.com/taylorchu/work?status.png)](https://godoc.org/github.com/taylorchu/work)
 [![Go Report Card](https://goreportcard.com/badge/github.com/taylorchu/work)](https://goreportcard.com/report/github.com/taylorchu/work)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ftaylorchu%2Fwork.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Ftaylorchu%2Fwork?ref=badge_shield)
+[![CircleCI](https://circleci.com/gh/taylorchu/work.svg?style=svg)](https://circleci.com/gh/taylorchu/work)
 
 
 This is the in-progress repo for gocraft/work rewrite.
@@ -36,6 +37,7 @@ This is the in-progress repo for gocraft/work rewrite.
     PASS
     ok  	github.com/taylorchu/work	87.901s
     ```
+- [ ] http enqueuer
 
 
 ## License
