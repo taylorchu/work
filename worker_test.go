@@ -3,6 +3,7 @@ package work
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -322,7 +323,7 @@ func TestWorkerRunJob(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.EqualValues(t, 1, job.Retries)
-		require.Equal(t, "unexpected", job.LastError)
+		require.True(t, strings.HasPrefix(job.LastError, "panic: unexpected"))
 	}
 }
 

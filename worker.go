@@ -3,6 +3,7 @@ package work
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -297,7 +298,7 @@ func catchPanic(f HandleFunc) HandleFunc {
 	return func(job *Job, opt *DequeueOptions) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = errors.New(fmt.Sprint(r))
+				err = fmt.Errorf("panic: %v\n\n%s", r, debug.Stack())
 			}
 		}()
 		return f(job, opt)
