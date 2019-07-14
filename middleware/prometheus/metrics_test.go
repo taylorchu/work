@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
 )
@@ -30,7 +30,7 @@ func TestHandleFuncMetrics(t *testing.T) {
 	require.Error(t, err)
 
 	r := httptest.NewRecorder()
-	prometheus.Handler().ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
+	promhttp.Handler().ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
 
 	for _, m := range []string{
 		`work_job_executed_total{`,
@@ -60,7 +60,7 @@ func TestEnqueueFuncMetrics(t *testing.T) {
 	require.Error(t, err)
 
 	r := httptest.NewRecorder()
-	prometheus.Handler().ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
+	promhttp.Handler().ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
 
 	for _, m := range []string{
 		`work_job_enqueued_total{`,
