@@ -35,7 +35,7 @@ var (
 	jobReadyTotal = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "work",
-			Name:      "job_ready_total",
+			Name:      "job_ready",
 			Help:      "Total jobs that can be executed now",
 		},
 		[]string{"namespace", "queue"},
@@ -43,7 +43,7 @@ var (
 	jobScheduledTotal = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "work",
-			Name:      "job_scheduled_total",
+			Name:      "job_scheduled",
 			Help:      "Total jobs that can only be executed in future",
 		},
 		[]string{"namespace", "queue"},
