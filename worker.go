@@ -173,7 +173,7 @@ func (w *Worker) start(h handler) {
 			Namespace: ns,
 			QueueID:   h.QueueID,
 		}
-		bulkDeq, ok := queue.(bulkDequeuer)
+		bulkDeq, ok := queue.(BulkDequeuer)
 		if ok {
 			err := bulkDeq.BulkAck(ackJobs, opt)
 			if err != nil {
@@ -231,7 +231,7 @@ func (w *Worker) start(h handler) {
 }
 
 func getDequeueFunc(queue Queue) DequeueFunc {
-	bulkDeq, ok := queue.(bulkDequeuer)
+	bulkDeq, ok := queue.(BulkDequeuer)
 	if !ok {
 		return queue.Dequeue
 	}

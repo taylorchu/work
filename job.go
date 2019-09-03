@@ -170,11 +170,13 @@ type Queue interface {
 	Dequeuer
 }
 
-type bulkEnqueuer interface {
+// BulkEnqueuer enqueues jobs in a batch.
+type BulkEnqueuer interface {
 	BulkEnqueue([]*Job, *EnqueueOptions) error
 }
 
-type bulkDequeuer interface {
+// BulkDequeuer dequeues jobs in a batch.
+type BulkDequeuer interface {
 	BulkDequeue(int64, *DequeueOptions) ([]*Job, error)
 	BulkAck([]*Job, *AckOptions) error
 }

@@ -254,8 +254,8 @@ func (q *sidekiqQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
 
 var (
 	_ MetricsExporter = (*sidekiqQueue)(nil)
-	_ bulkEnqueuer    = (*sidekiqQueue)(nil)
-	_ bulkDequeuer    = (*sidekiqQueue)(nil)
+	_ BulkEnqueuer    = (*sidekiqQueue)(nil)
+	_ BulkDequeuer    = (*sidekiqQueue)(nil)
 )
 
 func (q *sidekiqQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, error) {
