@@ -61,6 +61,7 @@ func NewWorker(opt *WorkerOptions) *Worker {
 
 // JobOptions specifies how a job is executed.
 type JobOptions struct {
+	WorkerOptions
 	MaxExecutionTime time.Duration
 	IdleWait         time.Duration
 	NumGoroutines    int64
@@ -143,7 +144,16 @@ func (w *Worker) Start() {
 func (w *Worker) start(h handler) {
 	defer w.wg.Done()
 
-	dequeue := getDequeueFunc(w.queue)
+	queue := w.queue
+	if h.JobOptions.Queue != nil {
+		queue = h.JobOptions.Queue
+	}
+	ns := w.namespace
+	if h.JobOptions.Namespace != "" {
+		ns = h.JobOptions.Namespace
+	}
+
+	dequeue := getDequeueFunc(queue)
 	for _, mw := range h.JobOptions.DequeueMiddleware {
 		dequeue = mw(dequeue)
 	}
@@ -154,16 +164,16 @@ func (w *Worker) start(h handler) {
 		handle = mw(handle)
 	}
 	handle = catchPanic(handle)
-	handle = retry(w.queue)(handle)
+	handle = retry(queue)(handle)
 
 	// prepare bulk ack flush
 	var ackJobs []*Job
 	flush := func() error {
 		opt := &AckOptions{
-			Namespace: w.namespace,
+			Namespace: ns,
 			QueueID:   h.QueueID,
 		}
-		bulkDeq, ok := w.queue.(bulkDequeuer)
+		bulkDeq, ok := queue.(bulkDequeuer)
 		if ok {
 			err := bulkDeq.BulkAck(ackJobs, opt)
 			if err != nil {
@@ -173,7 +183,7 @@ func (w *Worker) start(h handler) {
 			return nil
 		}
 		for _, job := range ackJobs {
-			err := w.queue.Ack(job, opt)
+			err := queue.Ack(job, opt)
 			if err != nil {
 				return err
 			}
@@ -196,7 +206,7 @@ func (w *Worker) start(h handler) {
 		default:
 			func() error {
 				opt := &DequeueOptions{
-					Namespace:    w.namespace,
+					Namespace:    ns,
 					QueueID:      h.QueueID,
 					At:           time.Now(),
 					InvisibleSec: int64(2 * (h.JobOptions.MaxExecutionTime + flushIntv) / time.Second),
@@ -247,16 +257,22 @@ func getDequeueFunc(queue Queue) DequeueFunc {
 
 // ExportMetrics dumps queue stats if the queue implements MetricsExporter.
 func (w *Worker) ExportMetrics() (*Metrics, error) {
-	exporter, ok := w.queue.(MetricsExporter)
-	if !ok {
-		return nil, ErrUnsupported
-	}
-	var (
-		queueMetrics []*QueueMetrics
-	)
+	var queueMetrics []*QueueMetrics
 	for _, h := range w.handlerMap {
+		queue := w.queue
+		if h.JobOptions.Queue != nil {
+			queue = h.JobOptions.Queue
+		}
+		ns := w.namespace
+		if h.JobOptions.Namespace != "" {
+			ns = h.JobOptions.Namespace
+		}
+		exporter, ok := queue.(MetricsExporter)
+		if !ok {
+			continue
+		}
 		m, err := exporter.GetQueueMetrics(&QueueMetricsOptions{
-			Namespace: w.namespace,
+			Namespace: ns,
 			QueueID:   h.QueueID,
 			At:        time.Now(),
 		})
