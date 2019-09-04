@@ -19,12 +19,12 @@ type sidekiqQueue struct {
 
 // See https://github.com/mperham/sidekiq/wiki/Job-Format.
 type sidekiqJob struct {
-	Class     string      `json:"class"`
-	ID        string      `json:"jid"`
-	Args      interface{} `json:"args"`
-	CreatedAt int64       `json:"created_at"`
-	Queue     string      `json:"queue,omitempty"`
-	Retry     bool        `json:"retry,omitempty"`
+	Class     string          `json:"class"`
+	ID        string          `json:"jid"`
+	Args      json.RawMessage `json:"args"`
+	CreatedAt int64           `json:"created_at"`
+	Queue     string          `json:"queue,omitempty"`
+	Retry     bool            `json:"retry,omitempty"`
 }
 
 // NewQueue creates a new queue stored in redis with sidekiq-compatible format.
@@ -122,15 +122,10 @@ func newSidekiqJob(job *work.Job, sqQueue, sqClass string) (*sidekiqJob, error) 
 	sqJob := sidekiqJob{
 		Class:     sqClass,
 		ID:        job.ID,
+		Args:      job.Payload,
 		CreatedAt: job.EnqueuedAt.Unix(),
 		Queue:     sqQueue,
 		Retry:     true,
-	}
-	if len(job.Payload) > 0 {
-		err := job.UnmarshalPayload(&sqJob.Args)
-		if err != nil {
-			return nil, err
-		}
 	}
 	return &sqJob, nil
 }
@@ -138,15 +133,10 @@ func newSidekiqJob(job *work.Job, sqQueue, sqClass string) (*sidekiqJob, error) 
 func newJob(sqJob *sidekiqJob) (*work.Job, error) {
 	job := work.Job{
 		ID:         sqJob.ID,
+		Payload:    sqJob.Args,
 		CreatedAt:  time.Unix(sqJob.CreatedAt, 0),
 		UpdatedAt:  time.Unix(sqJob.CreatedAt, 0),
 		EnqueuedAt: time.Unix(sqJob.CreatedAt, 0),
-	}
-	if sqJob.Args != nil {
-		err := job.MarshalPayload(sqJob.Args)
-		if err != nil {
-			return nil, err
-		}
 	}
 	return &job, nil
 }

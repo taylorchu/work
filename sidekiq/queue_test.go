@@ -43,7 +43,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 	}
 
 	job := work.NewJob()
-	err := job.MarshalPayload(message{Text: "hello"})
+	err := job.MarshalJSONPayload(message{Text: "hello"})
 	require.NoError(t, err)
 
 	err = q.Enqueue(job, &work.EnqueueOptions{
@@ -120,7 +120,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	}
 
 	job := work.NewJob()
-	err := job.MarshalPayload(message{Text: "hello"})
+	err := job.MarshalJSONPayload(message{Text: "hello"})
 	require.NoError(t, err)
 	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
 
@@ -206,7 +206,7 @@ func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
 	}
 
 	job := work.NewJob()
-	err := job.MarshalPayload(message{Text: "hello"})
+	err := job.MarshalJSONPayload(message{Text: "hello"})
 	require.NoError(t, err)
 
 	err = q.Enqueue(job, &work.EnqueueOptions{
