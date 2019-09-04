@@ -1,4 +1,4 @@
-package work
+package sidekiq
 
 import (
 	"encoding/json"
@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/go-redis/redis"
+	"github.com/taylorchu/work"
 )
 
 type sidekiqQueue struct {
-	*redisQueue
-
+	redisQueue     work.Queue
+	client         *redis.Client
 	enqueueScript  *redis.Script
 	dequeueScript  *redis.Script
 	scheduleScript *redis.Script
@@ -19,14 +20,14 @@ type sidekiqQueue struct {
 // See https://github.com/mperham/sidekiq/wiki/Job-Format.
 type sidekiqJob struct {
 	Class     string      `json:"class"`
-	Jid       string      `json:"jid"`
+	ID        string      `json:"jid"`
 	Args      interface{} `json:"args"`
 	CreatedAt int64       `json:"created_at"`
 	Queue     string      `json:"queue,omitempty"`
 	Retry     bool        `json:"retry,omitempty"`
 }
 
-// NewSidekiqQueue creates a new queue stored in redis with sidekiq-compatible format.
+// NewQueue creates a new queue stored in redis with sidekiq-compatible format.
 //
 // This assumes that there is another sidekiq instance that is already running, which moves
 // scheduled jobs into corresponding queues.
@@ -34,7 +35,7 @@ type sidekiqJob struct {
 //
 // Enqueued jobs are directly placed on the scheduled job queues. Dequeued jobs are
 // moved to work-compatible queue as soon as they can run immediately.
-func NewSidekiqQueue(client *redis.Client) Queue {
+func NewQueue(client *redis.Client) work.Queue {
 	// https://github.com/mperham/sidekiq/blob/e3839682a3d219b8a3708feab607c74241bc06b8/lib/sidekiq/client.rb#L190
 	enqueueScript := redis.NewScript(`
 	local ns = ARGV[1]
@@ -98,14 +99,15 @@ func NewSidekiqQueue(client *redis.Client) Queue {
 	`)
 
 	return &sidekiqQueue{
-		redisQueue:     NewRedisQueue(client).(*redisQueue),
+		redisQueue:     work.NewRedisQueue(client),
+		client:         client,
 		enqueueScript:  enqueueScript,
 		dequeueScript:  dequeueScript,
 		scheduleScript: scheduleScript,
 	}
 }
 
-func parseSidekiqQueueID(s string) (queue, class string) {
+func parseQueueID(s string) (queue, class string) {
 	queueClass := strings.SplitN(s, "/", 2)
 	switch len(queueClass) {
 	case 2:
@@ -116,10 +118,10 @@ func parseSidekiqQueueID(s string) (queue, class string) {
 	return
 }
 
-func toSidekiqJob(job *Job, sqQueue, sqClass string) (*sidekiqJob, error) {
+func newSidekiqJob(job *work.Job, sqQueue, sqClass string) (*sidekiqJob, error) {
 	sqJob := sidekiqJob{
 		Class:     sqClass,
-		Jid:       job.ID,
+		ID:        job.ID,
 		CreatedAt: job.EnqueuedAt.Unix(),
 		Queue:     sqQueue,
 		Retry:     true,
@@ -133,9 +135,9 @@ func toSidekiqJob(job *Job, sqQueue, sqClass string) (*sidekiqJob, error) {
 	return &sqJob, nil
 }
 
-func fromSidekiqJob(sqJob *sidekiqJob) (*Job, error) {
-	job := Job{
-		ID:         sqJob.Jid,
+func newJob(sqJob *sidekiqJob) (*work.Job, error) {
+	job := work.Job{
+		ID:         sqJob.ID,
 		CreatedAt:  time.Unix(sqJob.CreatedAt, 0),
 		UpdatedAt:  time.Unix(sqJob.CreatedAt, 0),
 		EnqueuedAt: time.Unix(sqJob.CreatedAt, 0),
@@ -149,11 +151,11 @@ func fromSidekiqJob(sqJob *sidekiqJob) (*Job, error) {
 	return &job, nil
 }
 
-func (q *sidekiqQueue) Enqueue(job *Job, opt *EnqueueOptions) error {
-	return q.BulkEnqueue([]*Job{job}, opt)
+func (q *sidekiqQueue) Enqueue(job *work.Job, opt *work.EnqueueOptions) error {
+	return q.BulkEnqueue([]*work.Job{job}, opt)
 }
 
-func (q *sidekiqQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
+func (q *sidekiqQueue) BulkEnqueue(jobs []*work.Job, opt *work.EnqueueOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
@@ -161,11 +163,11 @@ func (q *sidekiqQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 	if len(jobs) == 0 {
 		return nil
 	}
-	sqQueue, sqClass := parseSidekiqQueueID(opt.QueueID)
+	sqQueue, sqClass := parseQueueID(opt.QueueID)
 	args := make([]interface{}, 1+2*len(jobs))
 	args[0] = opt.Namespace
 	for i, job := range jobs {
-		sqJob, err := toSidekiqJob(job, sqQueue, sqClass)
+		sqJob, err := newSidekiqJob(job, sqQueue, sqClass)
 		if err != nil {
 			return err
 		}
@@ -179,7 +181,7 @@ func (q *sidekiqQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 	return q.enqueueScript.Run(q.client, nil, args...).Err()
 }
 
-func (q *sidekiqQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
+func (q *sidekiqQueue) Dequeue(opt *work.DequeueOptions) (*work.Job, error) {
 	jobs, err := q.BulkDequeue(1, opt)
 	if err != nil {
 		return nil, err
@@ -191,12 +193,12 @@ func (q *sidekiqQueue) schedule(ns string, at time.Time) error {
 	return q.scheduleScript.Run(q.client, nil, ns, at.Unix()).Err()
 }
 
-func (q *sidekiqQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, error) {
+func (q *sidekiqQueue) BulkDequeue(count int64, opt *work.DequeueOptions) ([]*work.Job, error) {
 	err := opt.Validate()
 	if err != nil {
 		return nil, err
 	}
-	sqQueue, sqClass := parseSidekiqQueueID(opt.QueueID)
+	sqQueue, sqClass := parseQueueID(opt.QueueID)
 	res, err := q.dequeueScript.Run(q.client, nil,
 		opt.Namespace,
 		sqQueue,
@@ -207,20 +209,20 @@ func (q *sidekiqQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, er
 		}
 	} else {
 		jobm := res.([]interface{})
-		jobs := make([]*Job, len(jobm))
+		jobs := make([]*work.Job, len(jobm))
 		for i, iface := range jobm {
 			var sqJob sidekiqJob
 			err := json.NewDecoder(strings.NewReader(iface.(string))).Decode(&sqJob)
 			if err != nil {
 				return nil, err
 			}
-			job, err := fromSidekiqJob(&sqJob)
+			job, err := newJob(&sqJob)
 			if err != nil {
 				return nil, err
 			}
 			jobs[i] = job
 		}
-		err = q.redisQueue.BulkEnqueue(jobs, &EnqueueOptions{
+		err = q.redisQueue.(work.BulkEnqueuer).BulkEnqueue(jobs, &work.EnqueueOptions{
 			Namespace: opt.Namespace,
 			QueueID:   sqClass,
 		})
@@ -228,7 +230,7 @@ func (q *sidekiqQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, er
 			return nil, err
 		}
 	}
-	return q.redisQueue.BulkDequeue(count, &DequeueOptions{
+	return q.redisQueue.(work.BulkDequeuer).BulkDequeue(count, &work.DequeueOptions{
 		Namespace:    opt.Namespace,
 		QueueID:      sqClass,
 		At:           opt.At,
@@ -236,35 +238,35 @@ func (q *sidekiqQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, er
 	})
 }
 
-func (q *sidekiqQueue) Ack(job *Job, opt *AckOptions) error {
-	return q.BulkAck([]*Job{job}, opt)
+func (q *sidekiqQueue) Ack(job *work.Job, opt *work.AckOptions) error {
+	return q.BulkAck([]*work.Job{job}, opt)
 }
 
-func (q *sidekiqQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
+func (q *sidekiqQueue) BulkAck(jobs []*work.Job, opt *work.AckOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
 	}
-	_, sqClass := parseSidekiqQueueID(opt.QueueID)
-	return q.redisQueue.BulkAck(jobs, &AckOptions{
+	_, sqClass := parseQueueID(opt.QueueID)
+	return q.redisQueue.(work.BulkDequeuer).BulkAck(jobs, &work.AckOptions{
 		Namespace: opt.Namespace,
 		QueueID:   sqClass,
 	})
 }
 
 var (
-	_ MetricsExporter = (*sidekiqQueue)(nil)
-	_ BulkEnqueuer    = (*sidekiqQueue)(nil)
-	_ BulkDequeuer    = (*sidekiqQueue)(nil)
+	_ work.MetricsExporter = (*sidekiqQueue)(nil)
+	_ work.BulkEnqueuer    = (*sidekiqQueue)(nil)
+	_ work.BulkDequeuer    = (*sidekiqQueue)(nil)
 )
 
-func (q *sidekiqQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, error) {
+func (q *sidekiqQueue) GetQueueMetrics(opt *work.QueueMetricsOptions) (*work.QueueMetrics, error) {
 	err := opt.Validate()
 	if err != nil {
 		return nil, err
 	}
-	_, sqClass := parseSidekiqQueueID(opt.QueueID)
-	return q.redisQueue.GetQueueMetrics(&QueueMetricsOptions{
+	_, sqClass := parseQueueID(opt.QueueID)
+	return q.redisQueue.(work.MetricsExporter).GetQueueMetrics(&work.QueueMetricsOptions{
 		Namespace: opt.Namespace,
 		QueueID:   sqClass,
 		At:        opt.At,

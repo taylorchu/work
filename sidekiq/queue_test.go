@@ -1,29 +1,52 @@
-package work
+package sidekiq
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/require"
+	"github.com/taylorchu/work"
+	"github.com/vmihailenco/msgpack"
 )
+
+func newRedisClient() *redis.Client {
+	return redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:6379",
+		PoolSize:     10,
+		MinIdleConns: 10,
+	})
+}
+
+func marshal(v interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := msgpack.NewEncoder(&buf)
+	enc.UseCompactEncoding(true)
+	enc.SortMapKeys(true)
+	err := enc.Encode(v)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
 
 func TestSidekiqQueueEnqueue(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
-	q := NewSidekiqQueue(client)
+	q := NewQueue(client)
 
 	type message struct {
 		Text string
 	}
 
-	job := NewJob()
+	job := work.NewJob()
 	err := job.MarshalPayload(message{Text: "hello"})
 	require.NoError(t, err)
 
-	err = q.Enqueue(job, &EnqueueOptions{
+	err = q.Enqueue(job, &work.EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -31,7 +54,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 
 	err = q.(*sidekiqQueue).schedule("ns1", job.EnqueuedAt)
 	require.NoError(t, err)
-	_, err = q.Dequeue(&DequeueOptions{
+	_, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           job.EnqueuedAt,
@@ -59,7 +82,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 	require.Equal(t, jobKey, z[0].Member)
 	require.EqualValues(t, job.EnqueuedAt.Unix(), z[0].Score)
 
-	err = q.Enqueue(job.Delay(time.Minute), &EnqueueOptions{
+	err = q.Enqueue(job.Delay(time.Minute), &work.EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -67,7 +90,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 
 	err = q.(*sidekiqQueue).schedule("ns1", job.Delay(time.Minute).EnqueuedAt)
 	require.NoError(t, err)
-	_, err = q.Dequeue(&DequeueOptions{
+	_, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           job.Delay(time.Minute).EnqueuedAt,
@@ -90,18 +113,18 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
-	q := NewSidekiqQueue(client)
+	q := NewQueue(client)
 
 	type message struct {
 		Text string
 	}
 
-	job := NewJob()
+	job := work.NewJob()
 	err := job.MarshalPayload(message{Text: "hello"})
 	require.NoError(t, err)
 	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
 
-	err = q.Enqueue(job, &EnqueueOptions{
+	err = q.Enqueue(job, &work.EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -111,7 +134,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 
 	err = q.(*sidekiqQueue).schedule("ns1", now)
 	require.NoError(t, err)
-	jobDequeued, err := q.Dequeue(&DequeueOptions{
+	jobDequeued, err := q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           now,
@@ -132,7 +155,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 
 	err = q.(*sidekiqQueue).schedule("ns1", now)
 	require.NoError(t, err)
-	jobDequeued, err = q.Dequeue(&DequeueOptions{
+	jobDequeued, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           now,
@@ -162,31 +185,31 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	// empty
 	err = q.(*sidekiqQueue).schedule("ns1", now)
 	require.NoError(t, err)
-	_, err = q.Dequeue(&DequeueOptions{
+	_, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           now,
 		InvisibleSec: 60,
 	})
 	require.Error(t, err)
-	require.Equal(t, ErrEmptyQueue, err)
+	require.Equal(t, work.ErrEmptyQueue, err)
 }
 
 func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
-	q := NewSidekiqQueue(client)
+	q := NewQueue(client)
 
 	type message struct {
 		Text string
 	}
 
-	job := NewJob()
+	job := work.NewJob()
 	err := job.MarshalPayload(message{Text: "hello"})
 	require.NoError(t, err)
 
-	err = q.Enqueue(job, &EnqueueOptions{
+	err = q.Enqueue(job, &work.EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -194,7 +217,7 @@ func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
 
 	err = q.(*sidekiqQueue).schedule("ns1", job.EnqueuedAt)
 	require.NoError(t, err)
-	_, err = q.Dequeue(&DequeueOptions{
+	_, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           job.EnqueuedAt,
@@ -216,13 +239,13 @@ func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
 
 	err = q.(*sidekiqQueue).schedule("ns1", job.EnqueuedAt)
 	require.NoError(t, err)
-	_, err = q.Dequeue(&DequeueOptions{
+	_, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           job.EnqueuedAt,
 		InvisibleSec: 60,
 	})
-	require.Equal(t, ErrEmptyQueue, err)
+	require.Equal(t, work.ErrEmptyQueue, err)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
 		redis.ZRangeBy{
@@ -237,11 +260,11 @@ func TestSidekiqQueueAck(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
-	q := NewSidekiqQueue(client)
+	q := NewQueue(client)
 
-	job := NewJob()
+	job := work.NewJob()
 
-	err := q.Enqueue(job, &EnqueueOptions{
+	err := q.Enqueue(job, &work.EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -249,7 +272,7 @@ func TestSidekiqQueueAck(t *testing.T) {
 
 	err = q.(*sidekiqQueue).schedule("ns1", job.EnqueuedAt)
 	require.NoError(t, err)
-	_, err = q.Dequeue(&DequeueOptions{
+	_, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           job.EnqueuedAt,
@@ -273,7 +296,7 @@ func TestSidekiqQueueAck(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 1, e)
 
-	err = q.Ack(job, &AckOptions{
+	err = q.Ack(job, &work.AckOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -291,7 +314,7 @@ func TestSidekiqQueueAck(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 0, e)
 
-	err = q.Ack(job, &AckOptions{
+	err = q.Ack(job, &work.AckOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -302,11 +325,11 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
-	q := NewSidekiqQueue(client)
+	q := NewQueue(client)
 
-	job := NewJob()
+	job := work.NewJob()
 
-	err := q.Enqueue(job, &EnqueueOptions{
+	err := q.Enqueue(job, &work.EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -314,7 +337,7 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 
 	err = q.(*sidekiqQueue).schedule("ns1", job.EnqueuedAt)
 	require.NoError(t, err)
-	_, err = q.Dequeue(&DequeueOptions{
+	_, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "ns1",
 		QueueID:      "low/q1",
 		At:           job.EnqueuedAt,
@@ -322,7 +345,7 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	m, err := q.(MetricsExporter).GetQueueMetrics(&QueueMetricsOptions{
+	m, err := q.(work.MetricsExporter).GetQueueMetrics(&work.QueueMetricsOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 		At:        job.EnqueuedAt,
@@ -333,7 +356,7 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 	require.EqualValues(t, 1, m.ReadyTotal)
 	require.EqualValues(t, 0, m.ScheduledTotal)
 
-	m, err = q.(MetricsExporter).GetQueueMetrics(&QueueMetricsOptions{
+	m, err = q.(work.MetricsExporter).GetQueueMetrics(&work.QueueMetricsOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 		At:        job.EnqueuedAt.Add(-time.Second),
