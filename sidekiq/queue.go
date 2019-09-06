@@ -1,6 +1,7 @@
 package sidekiq
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -26,7 +27,7 @@ type sidekiqJob struct {
 	CreatedAt  float64         `json:"created_at"`
 	EnqueuedAt float64         `json:"enqueued_at,omitempty"`
 	Queue      string          `json:"queue,omitempty"`
-	Retry      bool            `json:"retry,omitempty"`
+	Retry      json.RawMessage `json:"retry,omitempty"`
 }
 
 // sidekiq job validation errors
@@ -34,8 +35,9 @@ var (
 	ErrJobEmptyClass      = errors.New("sidekiq: empty job class")
 	ErrJobMismatchedClass = errors.New("sidekiq: job class does not match queue id")
 	ErrJobEmptyID         = errors.New("sidekiq: empty job id")
-	ErrJobCreatedAt       = errors.New("sidekiq: created_at should be > 0")
-	ErrJobEnqueuedAt      = errors.New("sidekiq: enqueued_at should be > 0")
+	ErrJobCreatedAt       = errors.New("sidekiq: job created_at should be > 0")
+	ErrJobEnqueuedAt      = errors.New("sidekiq: job enqueued_at should be > 0")
+	ErrJobArgs            = errors.New("sidekiq: job args should be an array")
 )
 
 func (j *sidekiqJob) Validate() error {
@@ -50,6 +52,9 @@ func (j *sidekiqJob) Validate() error {
 	}
 	if j.EnqueuedAt <= 0 {
 		return ErrJobEnqueuedAt
+	}
+	if !(bytes.HasPrefix(j.Args, []byte("[")) && bytes.HasSuffix(j.Args, []byte("]"))) {
+		return ErrJobArgs
 	}
 	return nil
 }
@@ -153,7 +158,7 @@ func newSidekiqJob(job *work.Job, sqQueue, sqClass string) (*sidekiqJob, error) 
 		CreatedAt:  float64(job.CreatedAt.Unix()),
 		EnqueuedAt: float64(job.EnqueuedAt.Unix()),
 		Queue:      sqQueue,
-		Retry:      true,
+		Retry:      []byte("true"),
 	}
 	return &sqJob, nil
 }
@@ -186,6 +191,10 @@ func (q *sidekiqQueue) BulkEnqueue(jobs []*work.Job, opt *work.EnqueueOptions) e
 	args[0] = opt.Namespace
 	for i, job := range jobs {
 		sqJob, err := newSidekiqJob(job, sqQueue, sqClass)
+		if err != nil {
+			return err
+		}
+		err = sqJob.Validate()
 		if err != nil {
 			return err
 		}

@@ -32,18 +32,68 @@ func marshal(v interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func TestSidekiqQueueEnqueueExternal(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(t, client.FlushAll().Err())
+
+	q := NewQueue(client)
+	job := work.NewJob()
+	job.ID = "0e821cf2-d0cc-11e9-92f2-d059e4b80cfc"
+	job.CreatedAt = time.Unix(1567791044, 0)
+	job.UpdatedAt = time.Unix(1567791044, 0)
+	job.EnqueuedAt = time.Unix(1567791044, 0)
+
+	err := job.MarshalJSONPayload([]int{1, 2, 3})
+	require.NoError(t, err)
+
+	err = q.Enqueue(job, &work.EnqueueOptions{
+		Namespace: "sidekiq",
+		QueueID:   "import/TestWorker",
+	})
+	require.NoError(t, err)
+
+	z, err := client.ZRangeByScoreWithScores("sidekiq:schedule",
+		redis.ZRangeBy{
+			Min: "-inf",
+			Max: "+inf",
+		}).Result()
+	require.NoError(t, err)
+	require.Len(t, z, 1)
+	require.Equal(t, `{"class":"TestWorker","jid":"0e821cf2-d0cc-11e9-92f2-d059e4b80cfc","args":[1,2,3],"created_at":1567791044,"enqueued_at":1567791044,"queue":"import","retry":true}`, z[0].Member)
+	require.EqualValues(t, 1567791044, z[0].Score)
+}
+
+func TestSidekiqQueueDequeueExternal(t *testing.T) {
+	client := newRedisClient()
+	defer client.Close()
+	require.NoError(t, client.FlushAll().Err())
+	err := client.LPush("sidekiq:queue:default", `{"class":"TestWorker","args":[],"retry":3,"queue":"default","backtrace":true,"jid":"83b27ea26dd65821239ca6aa","created_at":1567788643.0875323,"enqueued_at":1567788643.0879307}"`).Err()
+	require.NoError(t, err)
+
+	q := NewQueue(client)
+	job, err := q.Dequeue(&work.DequeueOptions{
+		Namespace:    "sidekiq",
+		QueueID:      "default/TestWorker",
+		At:           time.Now(),
+		InvisibleSec: 0,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "83b27ea26dd65821239ca6aa", job.ID)
+	require.EqualValues(t, 1567788643, job.CreatedAt.Unix())
+	require.EqualValues(t, 1567788643, job.UpdatedAt.Unix())
+	require.EqualValues(t, 1567788643, job.EnqueuedAt.Unix())
+	require.EqualValues(t, "[]", job.Payload)
+}
+
 func TestSidekiqQueueEnqueue(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewQueue(client)
 
-	type message struct {
-		Text string
-	}
-
 	job := work.NewJob()
-	err := job.MarshalJSONPayload(message{Text: "hello"})
+	err := job.MarshalJSONPayload([]int{1, 2, 3})
 	require.NoError(t, err)
 
 	err = q.Enqueue(job, &work.EnqueueOptions{
@@ -115,12 +165,8 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	require.NoError(t, client.FlushAll().Err())
 	q := NewQueue(client)
 
-	type message struct {
-		Text string
-	}
-
 	job := work.NewJob()
-	err := job.MarshalJSONPayload(message{Text: "hello"})
+	err := job.MarshalJSONPayload([]int{1, 2, 3})
 	require.NoError(t, err)
 	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
 
@@ -201,12 +247,8 @@ func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
 	require.NoError(t, client.FlushAll().Err())
 	q := NewQueue(client)
 
-	type message struct {
-		Text string
-	}
-
 	job := work.NewJob()
-	err := job.MarshalJSONPayload(message{Text: "hello"})
+	err := job.MarshalJSONPayload([]int{1, 2, 3})
 	require.NoError(t, err)
 
 	err = q.Enqueue(job, &work.EnqueueOptions{
@@ -263,8 +305,10 @@ func TestSidekiqQueueAck(t *testing.T) {
 	q := NewQueue(client)
 
 	job := work.NewJob()
+	err := job.MarshalJSONPayload([]int{1, 2, 3})
+	require.NoError(t, err)
 
-	err := q.Enqueue(job, &work.EnqueueOptions{
+	err = q.Enqueue(job, &work.EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
@@ -328,8 +372,10 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 	q := NewQueue(client)
 
 	job := work.NewJob()
+	err := job.MarshalJSONPayload([]int{1, 2, 3})
+	require.NoError(t, err)
 
-	err := q.Enqueue(job, &work.EnqueueOptions{
+	err = q.Enqueue(job, &work.EnqueueOptions{
 		Namespace: "ns1",
 		QueueID:   "low/q1",
 	})
