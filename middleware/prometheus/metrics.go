@@ -24,6 +24,14 @@ var (
 		},
 		[]string{"namespace", "queue", "status"},
 	)
+	jobBusy = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "work",
+			Name:      "job_busy",
+			Help:      "Total jobs that are running now",
+		},
+		[]string{"namespace", "queue"},
+	)
 	jobEnqueuedTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "work",
@@ -63,6 +71,8 @@ func init() {
 // HandleFuncMetrics adds prometheus metrics like executed job count.
 func HandleFuncMetrics(f work.HandleFunc) work.HandleFunc {
 	return func(job *work.Job, opt *work.DequeueOptions) error {
+		jobBusy.WithLabelValues(opt.Namespace, opt.QueueID).Inc()
+		defer jobBusy.WithLabelValues(opt.Namespace, opt.QueueID).Dec()
 		startTime := time.Now()
 		err := f(job, opt)
 		if err != nil {
