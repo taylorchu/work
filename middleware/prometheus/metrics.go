@@ -61,6 +61,7 @@ var (
 func init() {
 	prometheus.MustRegister(jobExecutionTimeSeconds)
 	prometheus.MustRegister(jobExecutedTotal)
+	prometheus.MustRegister(jobBusy)
 
 	prometheus.MustRegister(jobEnqueuedTotal)
 
