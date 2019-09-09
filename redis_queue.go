@@ -203,8 +203,8 @@ func (q *redisQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
 
 var (
 	_ MetricsExporter = (*redisQueue)(nil)
-	_ bulkEnqueuer    = (*redisQueue)(nil)
-	_ bulkDequeuer    = (*redisQueue)(nil)
+	_ BulkEnqueuer    = (*redisQueue)(nil)
+	_ BulkDequeuer    = (*redisQueue)(nil)
 )
 
 func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, error) {

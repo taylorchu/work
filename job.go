@@ -2,6 +2,7 @@ package work
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -30,14 +31,29 @@ type Job struct {
 	LastError string `msgpack:"last_error"`
 }
 
-// UnmarshalPayload decodes the payload into a variable.
+// UnmarshalPayload decodes the msgpack payload into a variable.
 func (j *Job) UnmarshalPayload(v interface{}) error {
 	return unmarshal(bytes.NewReader(j.Payload), v)
 }
 
-// MarshalPayload encodes a variable into the payload.
+// UnmarshalJSONPayload decodes the JSON payload into a variable.
+func (j *Job) UnmarshalJSONPayload(v interface{}) error {
+	return json.Unmarshal(j.Payload, v)
+}
+
+// MarshalPayload encodes a variable into the msgpack payload.
 func (j *Job) MarshalPayload(v interface{}) error {
 	b, err := marshal(v)
+	if err != nil {
+		return err
+	}
+	j.Payload = b
+	return nil
+}
+
+// MarshalJSONPayload encodes a variable into the JSON payload.
+func (j *Job) MarshalJSONPayload(v interface{}) error {
+	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -170,11 +186,13 @@ type Queue interface {
 	Dequeuer
 }
 
-type bulkEnqueuer interface {
+// BulkEnqueuer enqueues jobs in a batch.
+type BulkEnqueuer interface {
 	BulkEnqueue([]*Job, *EnqueueOptions) error
 }
 
-type bulkDequeuer interface {
+// BulkDequeuer dequeues jobs in a batch.
+type BulkDequeuer interface {
 	BulkDequeue(int64, *DequeueOptions) ([]*Job, error)
 	BulkAck([]*Job, *AckOptions) error
 }
