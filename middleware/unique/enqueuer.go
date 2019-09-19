@@ -15,7 +15,7 @@ type Func func(*work.Job, *work.EnqueueOptions) ([]byte, time.Duration, error)
 
 // EnqueuerOptions defines job unique key generation.
 type EnqueuerOptions struct {
-	Client *redis.Client
+	Client redis.UniversalClient
 	// If returned []byte is nil, uniqness check is bypassed.
 	// Returned time.Duration controls how long the unique key exists.
 	UniqueFunc Func
