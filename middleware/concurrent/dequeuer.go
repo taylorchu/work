@@ -8,7 +8,7 @@ import (
 
 // DequeuerOptions defines how many jobs in the same queue can be running at the same time.
 type DequeuerOptions struct {
-	Client *redis.Client
+	Client redis.UniversalClient
 	Max    int64
 
 	workerID      string // for testing

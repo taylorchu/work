@@ -8,7 +8,7 @@ import (
 )
 
 type redisQueue struct {
-	client *redis.Client
+	client redis.UniversalClient
 
 	enqueueScript *redis.Script
 	dequeueScript *redis.Script
@@ -16,7 +16,7 @@ type redisQueue struct {
 }
 
 // NewRedisQueue creates a new queue stored in redis.
-func NewRedisQueue(client *redis.Client) Queue {
+func NewRedisQueue(client redis.UniversalClient) Queue {
 	enqueueScript := redis.NewScript(`
 	local ns = ARGV[1]
 	local queue_id = ARGV[2]

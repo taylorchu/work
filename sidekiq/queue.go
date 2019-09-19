@@ -13,7 +13,7 @@ import (
 
 type sidekiqQueue struct {
 	redisQueue     work.Queue
-	client         *redis.Client
+	client         redis.UniversalClient
 	enqueueScript  *redis.Script
 	dequeueScript  *redis.Script
 	scheduleScript *redis.Script
@@ -67,7 +67,7 @@ func (j *sidekiqJob) Validate() error {
 //
 // Enqueued jobs are directly placed on the scheduled job queues. Dequeued jobs are
 // moved to work-compatible queue as soon as they can run immediately.
-func NewQueue(client *redis.Client) work.Queue {
+func NewQueue(client redis.UniversalClient) work.Queue {
 	// https://github.com/mperham/sidekiq/blob/e3839682a3d219b8a3708feab607c74241bc06b8/lib/sidekiq/client.rb#L190
 	enqueueScript := redis.NewScript(`
 	local ns = ARGV[1]

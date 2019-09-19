@@ -62,7 +62,7 @@ func TestWorkerExportMetrics(t *testing.T) {
 	require.Equal(t, all.Queue[0].QueueID, "test")
 }
 
-func waitEmpty(client *redis.Client, key string, timeout time.Duration) error {
+func waitEmpty(client redis.UniversalClient, key string, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	defer timeoutTimer.Stop()
 
