@@ -260,7 +260,14 @@ func getDequeueFunc(queue Queue) DequeueFunc {
 	var jobs []*Job
 	return func(opt *DequeueOptions) (*Job, error) {
 		if len(jobs) == 0 {
-			const count = 1000
+			// this is an optimization to reduce system calls.
+			//
+			// there could be an idle period on startup
+			// because worker previously pulls in too many jobs.
+			count := 60 / opt.InvisibleSec
+			if count <= 0 {
+				count = 1
+			}
 			bulkOpt := *opt
 			bulkOpt.InvisibleSec *= count
 
