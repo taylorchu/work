@@ -81,7 +81,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 				for i := 0; i < k; i++ {
 					job := NewJob()
 
-					err := w.queue.Enqueue(job, &EnqueueOptions{
+					err := w.opt.Queue.Enqueue(job, &EnqueueOptions{
 						Namespace: "ns1",
 						QueueID:   "test",
 					})
