@@ -38,12 +38,12 @@ type handler struct {
 type WorkerOptions struct {
 	Namespace string
 	Queue     Queue
+	ErrorFunc func(error)
 }
 
 // Worker runs jobs.
 type Worker struct {
-	namespace string
-	queue     Queue
+	opt WorkerOptions
 
 	stop       chan struct{}
 	wg         sync.WaitGroup
@@ -53,8 +53,7 @@ type Worker struct {
 // NewWorker creates a new worker.
 func NewWorker(opt *WorkerOptions) *Worker {
 	return &Worker{
-		namespace:  opt.Namespace,
-		queue:      opt.Queue,
+		opt:        *opt,
 		handlerMap: make(map[string]handler),
 	}
 }
@@ -144,13 +143,21 @@ func (w *Worker) Start() {
 func (w *Worker) start(h handler) {
 	defer w.wg.Done()
 
-	queue := w.queue
+	queue := w.opt.Queue
 	if h.JobOptions.Queue != nil {
 		queue = h.JobOptions.Queue
 	}
-	ns := w.namespace
+	ns := w.opt.Namespace
 	if h.JobOptions.Namespace != "" {
 		ns = h.JobOptions.Namespace
+	}
+
+	// print errors by default so that problems are noticeable.
+	errFunc := func(err error) { fmt.Println(err) }
+	if h.JobOptions.ErrorFunc != nil {
+		errFunc = h.JobOptions.ErrorFunc
+	} else if w.opt.ErrorFunc != nil {
+		errFunc = w.opt.ErrorFunc
 	}
 
 	dequeue := getDequeueFunc(queue)
@@ -191,7 +198,12 @@ func (w *Worker) start(h handler) {
 		ackJobs = nil
 		return nil
 	}
-	defer flush()
+	defer func() {
+		err := flush()
+		if err != nil {
+			errFunc(err)
+		}
+	}()
 
 	const flushIntv = time.Second
 	flushTicker := time.NewTicker(flushIntv)
@@ -202,9 +214,12 @@ func (w *Worker) start(h handler) {
 		case <-w.stop:
 			return
 		case <-flushTicker.C:
-			flush()
+			err := flush()
+			if err != nil {
+				errFunc(err)
+			}
 		default:
-			func() error {
+			err := func() error {
 				opt := &DequeueOptions{
 					Namespace:    ns,
 					QueueID:      h.QueueID,
@@ -222,10 +237,16 @@ func (w *Worker) start(h handler) {
 				ackJobs = append(ackJobs, job)
 				if len(ackJobs) >= 1000 {
 					// prevent un-acked job count to be too large
-					flush()
+					err := flush()
+					if err != nil {
+						return err
+					}
 				}
 				return nil
 			}()
+			if err != nil {
+				errFunc(err)
+			}
 		}
 	}
 }
@@ -259,11 +280,11 @@ func getDequeueFunc(queue Queue) DequeueFunc {
 func (w *Worker) ExportMetrics() (*Metrics, error) {
 	var queueMetrics []*QueueMetrics
 	for _, h := range w.handlerMap {
-		queue := w.queue
+		queue := w.opt.Queue
 		if h.JobOptions.Queue != nil {
 			queue = h.JobOptions.Queue
 		}
-		ns := w.namespace
+		ns := w.opt.Namespace
 		if h.JobOptions.Namespace != "" {
 			ns = h.JobOptions.Namespace
 		}
