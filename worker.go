@@ -244,7 +244,7 @@ func (w *Worker) start(h handler) {
 				}
 				return nil
 			}()
-			if err != nil {
+			if err != nil && err != ErrIdleWait {
 				errFunc(err)
 			}
 		}
