@@ -20,3 +20,9 @@ jobs:
     steps:
       - checkout
       - run: go test -p 1 -v ./...
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - redis
+      - keydb
