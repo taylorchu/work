@@ -1,7 +1,6 @@
 package discard
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,8 @@ func TestInvalidPayload(t *testing.T) {
 		QueueID:   "q1",
 	}
 	h := InvalidPayload(func(*work.Job, *work.DequeueOptions) error {
-		return errors.New("msgpack: decode")
+		var s string
+		return job.UnmarshalPayload(&s)
 	})
 
 	err := h(job, opt)

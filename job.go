@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,12 +34,22 @@ type Job struct {
 
 // UnmarshalPayload decodes the msgpack payload into a variable.
 func (j *Job) UnmarshalPayload(v interface{}) error {
-	return unmarshal(bytes.NewReader(j.Payload), v)
+	// used in middleware/discard package.
+	err := unmarshal(bytes.NewReader(j.Payload), v)
+	if err != nil {
+		return fmt.Errorf("work: invalid job payload: %s", err)
+	}
+	return nil
 }
 
 // UnmarshalJSONPayload decodes the JSON payload into a variable.
 func (j *Job) UnmarshalJSONPayload(v interface{}) error {
-	return json.Unmarshal(j.Payload, v)
+	// used in middleware/discard package.
+	err := json.Unmarshal(j.Payload, v)
+	if err != nil {
+		return fmt.Errorf("work: invalid job payload: %s", err)
+	}
+	return nil
 }
 
 // MarshalPayload encodes a variable into the msgpack payload.

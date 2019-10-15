@@ -13,7 +13,7 @@ func InvalidPayload(f work.HandleFunc) work.HandleFunc {
 		err := f(job, opt)
 		if err != nil {
 			cerr := errors.Cause(err)
-			if strings.HasPrefix(cerr.Error(), "msgpack:") {
+			if strings.HasPrefix(cerr.Error(), "work: invalid job payload: ") {
 				return work.ErrUnrecoverable
 			}
 			return err
