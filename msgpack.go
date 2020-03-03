@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 )
 
 func marshal(v interface{}) ([]byte, error) {

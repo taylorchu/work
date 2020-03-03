@@ -9,7 +9,7 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 )
 
 func newRedisClient() *redis.Client {
