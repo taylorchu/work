@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,7 +76,7 @@ func waitEmpty(client redis.UniversalClient, key string, timeout time.Duration) 
 			return errors.New("timeout")
 		case <-ticker.C:
 			z, err := client.ZRangeByScoreWithScores(key,
-				redis.ZRangeBy{
+				&redis.ZRangeBy{
 					Min: "-inf",
 					Max: fmt.Sprint(time.Now().Unix()),
 				}).Result()
@@ -349,7 +349,7 @@ func TestRetry(t *testing.T) {
 	require.Equal(t, "", job.LastError)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -370,7 +370,7 @@ func TestRetry(t *testing.T) {
 		require.Equal(t, retryErr.Error(), job.LastError)
 
 		z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-			redis.ZRangeBy{
+			&redis.ZRangeBy{
 				Min: "-inf",
 				Max: "+inf",
 			}).Result()

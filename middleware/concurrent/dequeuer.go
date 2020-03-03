@@ -1,7 +1,7 @@
 package concurrent
 
 import (
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/google/uuid"
 	"github.com/taylorchu/work"
 )

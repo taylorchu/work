@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
 )
@@ -67,7 +67,7 @@ func TestDequeuer(t *testing.T) {
 	require.Equal(t, 5, called)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:lock:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -95,7 +95,7 @@ func TestDequeuer(t *testing.T) {
 	require.Equal(t, 5, called)
 
 	z, err = client.ZRangeByScoreWithScores("ns1:lock:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -125,7 +125,7 @@ func TestDequeuer(t *testing.T) {
 	require.Equal(t, 7, called)
 
 	z, err = client.ZRangeByScoreWithScores("ns1:lock:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()

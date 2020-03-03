@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
 	"github.com/vmihailenco/msgpack/v4"
@@ -54,7 +54,7 @@ func TestSidekiqQueueEnqueueExternal(t *testing.T) {
 	require.NoError(t, err)
 
 	z, err := client.ZRangeByScoreWithScores("sidekiq:schedule",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -123,7 +123,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 	}, h)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -149,7 +149,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 	require.NoError(t, err)
 
 	z, err = client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -190,7 +190,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	require.Equal(t, job, jobDequeued)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -219,7 +219,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	}, h)
 
 	z, err = client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -290,7 +290,7 @@ func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
 	require.Equal(t, work.ErrEmptyQueue, err)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -327,7 +327,7 @@ func TestSidekiqQueueAck(t *testing.T) {
 	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -347,7 +347,7 @@ func TestSidekiqQueueAck(t *testing.T) {
 	require.NoError(t, err)
 
 	z, err = client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
