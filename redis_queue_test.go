@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,7 +48,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 	}, h)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -64,7 +64,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 	require.NoError(t, err)
 
 	z, err = client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -107,7 +107,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 	require.Equal(t, job, jobDequeued)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -134,7 +134,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 	}, h)
 
 	z, err = client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -195,7 +195,7 @@ func TestRedisQueueDequeueDeletedJob(t *testing.T) {
 	require.Equal(t, ErrEmptyQueue, err)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -220,7 +220,7 @@ func TestRedisQueueAck(t *testing.T) {
 	jobKey := fmt.Sprintf("ns1:job:%s", job.ID)
 
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
@@ -240,7 +240,7 @@ func TestRedisQueueAck(t *testing.T) {
 	require.NoError(t, err)
 
 	z, err = client.ZRangeByScoreWithScores("ns1:queue:q1",
-		redis.ZRangeBy{
+		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
 		}).Result()
