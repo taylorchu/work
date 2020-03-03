@@ -59,6 +59,7 @@ func NewWorker(opt *WorkerOptions) *Worker {
 }
 
 // JobOptions specifies how a job is executed.
+// It overrides default WorkerOptions so each handler can have different execution settings.
 type JobOptions struct {
 	WorkerOptions
 	MaxExecutionTime time.Duration
@@ -116,6 +117,7 @@ var (
 )
 
 // Register adds handler for a queue.
+// queueID and namespace should be the same as the one used to enqueue.
 func (w *Worker) Register(queueID string, h HandleFunc, opt *JobOptions) error {
 	err := opt.Validate()
 	if err != nil {
