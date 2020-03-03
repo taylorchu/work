@@ -1,18 +1,28 @@
 version: 2
 jobs:
-  redis:
+  redis5:
     docker:
-      - image: circleci/golang:1.13
+      - image: circleci/golang:1.14
         environment:
           - GO111MODULE=on
-      - image: redis:alpine
+      - image: redis:6.0-rc-alpine
+    working_directory: /go/src/github.com/taylorchu/work
+    steps:
+      - checkout
+      - run: go test -p 1 -v ./...
+  redis6:
+    docker:
+      - image: circleci/golang:1.14
+        environment:
+          - GO111MODULE=on
+      - image: redis:5.0-alpine
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
       - run: go test -p 1 -v ./...
   keydb:
     docker:
-      - image: circleci/golang:1.13
+      - image: circleci/golang:1.14
         environment:
           - GO111MODULE=on
       - image: eqalpha/keydb
@@ -24,5 +34,6 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - redis
+      - redis5
+      - redis6
       - keydb
