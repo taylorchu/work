@@ -6,13 +6,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-redis/redis"
 	"github.com/gocraft/work"
 	redigo "github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/require"
+	work2 "github.com/taylorchu/work"
 )
 
 func BenchmarkWorkerRunJob(b *testing.B) {
-	client := newRedisClient()
+	client := redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:6379",
+		PoolSize:     10,
+		MinIdleConns: 10,
+	})
 	defer client.Close()
 
 	pool := &redigo.Pool{
@@ -60,17 +66,18 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 				b.StopTimer()
 				require.NoError(b, client.FlushAll().Err())
 
-				w := NewWorker(&WorkerOptions{
+				queue := work2.NewRedisQueue(client)
+				w := work2.NewWorker(&work2.WorkerOptions{
 					Namespace: "ns1",
-					Queue:     NewRedisQueue(client),
+					Queue:     queue,
 				})
 				var wg sync.WaitGroup
 				err := w.Register("test",
-					func(*Job, *DequeueOptions) error {
+					func(*work2.Job, *work2.DequeueOptions) error {
 						wg.Done()
 						return nil
 					},
-					&JobOptions{
+					&work2.JobOptions{
 						MaxExecutionTime: time.Minute,
 						IdleWait:         time.Second,
 						NumGoroutines:    1,
@@ -79,9 +86,9 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 				require.NoError(b, err)
 
 				for i := 0; i < k; i++ {
-					job := NewJob()
+					job := work2.NewJob()
 
-					err := w.opt.Queue.Enqueue(job, &EnqueueOptions{
+					err := queue.Enqueue(job, &work2.EnqueueOptions{
 						Namespace: "ns1",
 						QueueID:   "test",
 					})
