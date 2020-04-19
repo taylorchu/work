@@ -22,6 +22,8 @@ type EnqueuerOptions struct {
 }
 
 var (
+	// ErrDedupDuration is returned when UniqueFunc returns a non-positive duration.
+	// The dedup key will expire too soon in redis.
 	ErrDedupDuration = errors.New("work: unique duration should be > 0")
 )
 
