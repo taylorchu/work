@@ -28,6 +28,8 @@ type Job struct {
 
 	// If the job previously fails, Retries will be incremented.
 	Retries int64 `msgpack:"retries"`
+	// Job will be retried only MaxRetries number of times
+	MaxRetries int64 `msgpack:"max_retries"`
 	// If the job previously fails, LastError will be populated with error string.
 	LastError string `msgpack:"last_error"`
 }
@@ -97,6 +99,12 @@ func (j Job) WithPayload(v interface{}) (*Job, error) {
 		return nil, err
 	}
 	return &j, nil
+}
+
+// WithPayload adds payload to the job.
+func (j *Job) WithMaxRetries(maxRetries int64) (*Job, error) {
+	j.MaxRetries = maxRetries
+	return j, nil
 }
 
 // options validation errors

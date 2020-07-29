@@ -356,6 +356,11 @@ func retry(queue Queue) HandleMiddleware {
 		return func(job *Job, opt *DequeueOptions) error {
 			err := f(job, opt)
 			if err != nil && err != ErrUnrecoverable {
+
+				if job.MaxRetries > 0 && job.Retries >= job.MaxRetries {
+					return ErrUnrecoverable
+				}
+
 				now := time.Now()
 				job.Retries++
 				job.LastError = err.Error()
