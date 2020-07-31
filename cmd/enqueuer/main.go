@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"os"
 
 	"github.com/go-redis/redis/v7"
 	"github.com/taylorchu/work"
@@ -23,7 +22,7 @@ func main() {
 	queue := work.NewRedisQueue(redisClient)
 
 	job := work.NewJob()
-	job.MarshalPayload(os.Args[1:])
+	job.MarshalPayload(flag.Args())
 	err = queue.Enqueue(job, &work.EnqueueOptions{
 		Namespace: *namespace,
 		QueueID:   "cmd_queue",
