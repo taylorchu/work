@@ -5,8 +5,7 @@
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ftaylorchu%2Fwork.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Ftaylorchu%2Fwork?ref=badge_shield)
 [![CircleCI](https://circleci.com/gh/taylorchu/work.svg?style=svg)](https://circleci.com/gh/taylorchu/work)
 
-
-This is the in-progress repo for gocraft/work rewrite.
+Please see `cmd/` for enqueuer and worker demo.
 
 ## Improvements
 
