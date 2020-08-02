@@ -172,7 +172,8 @@ func (w *Worker) start(h handler) {
 	for _, mw := range h.JobOptions.HandleMiddleware {
 		handle = mw(handle)
 	}
-	handle = catchPanic(handle)
+	// NOTE: comment the below line to prevent the panic and recover loop forever
+	//handle = catchPanic(handle)
 	handle = retry(queue)(handle)
 
 	// prepare bulk ack flush
