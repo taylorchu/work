@@ -32,12 +32,21 @@ type Job struct {
 	LastError string `msgpack:"last_error"`
 }
 
+// InvalidJobPayloadError wraps json or msgpack decoding error.
+type InvalidJobPayloadError struct {
+	Err error
+}
+
+func (e *InvalidJobPayloadError) Error() string {
+	return fmt.Sprintf("work: invalid job payload: %v", e.Err)
+}
+
 // UnmarshalPayload decodes the msgpack payload into a variable.
 func (j *Job) UnmarshalPayload(v interface{}) error {
 	// used in middleware/discard package.
 	err := unmarshal(bytes.NewReader(j.Payload), v)
 	if err != nil {
-		return fmt.Errorf("work: invalid job payload: %s", err)
+		return &InvalidJobPayloadError{Err: err}
 	}
 	return nil
 }
@@ -47,7 +56,7 @@ func (j *Job) UnmarshalJSONPayload(v interface{}) error {
 	// used in middleware/discard package.
 	err := json.Unmarshal(j.Payload, v)
 	if err != nil {
-		return fmt.Errorf("work: invalid job payload: %s", err)
+		return &InvalidJobPayloadError{Err: err}
 	}
 	return nil
 }
