@@ -107,7 +107,7 @@ var (
 	// ErrDoNotRetry is returned if the job should not be retried;
 	// this may be because the job is unrecoverable, or because
 	// the handler has already rescheduled it.
-	ErrDoNotRetry = errors.New("do not retry")
+	ErrDoNotRetry = errors.New("work: do not retry")
 
 	// ErrQueueNotFound is returned if the queue is not yet
 	// defined with Register().
@@ -115,7 +115,7 @@ var (
 
 	// ErrUnrecoverable is returned if the error is unrecoverable.
 	// The job will be discarded.
-	ErrUnrecoverable = fmt.Errorf("work: permanent error%w", ErrDoNotRetry)
+	ErrUnrecoverable = fmt.Errorf("work: permanent error: %w", ErrDoNotRetry)
 
 	// ErrUnsupported is returned if it is not implemented.
 	ErrUnsupported = errors.New("work: unsupported")
@@ -251,7 +251,7 @@ func (w *Worker) start(h handler) {
 				}
 				return nil
 			}()
-			if err != nil && err != ErrEmptyQueue {
+			if err != nil && err != ErrEmptyQueue && !errors.Is(err, ErrDoNotRetry) {
 				errFunc(err)
 			}
 		}
@@ -360,7 +360,14 @@ func retry(queue Queue) HandleMiddleware {
 	return func(f HandleFunc) HandleFunc {
 		return func(job *Job, opt *DequeueOptions) error {
 			err := f(job, opt)
-			if err != nil && !errors.Is(err, ErrDoNotRetry) {
+			if err != nil {
+				if err == ErrUnrecoverable {
+					return nil // ack
+				}
+				if errors.Is(err, ErrDoNotRetry) {
+					// don't ack and don't reenqueue
+					return err
+				}
 				now := time.Now()
 				job.Retries++
 				job.LastError = err.Error()
@@ -381,9 +388,6 @@ func retry(queue Queue) HandleMiddleware {
 					Namespace: opt.Namespace,
 					QueueID:   opt.QueueID,
 				})
-				return err
-			}
-			if err != ErrUnrecoverable {
 				return err
 			}
 			return nil

@@ -357,7 +357,7 @@ func TestRetry(t *testing.T) {
 	require.Len(t, z, 0)
 
 	h = retrier(func(*Job, *DequeueOptions) error {
-		return fmt.Errorf("recoverable, but not retried%w", ErrDoNotRetry)
+		return fmt.Errorf("recoverable, but not retried: %w", ErrDoNotRetry)
 	})
 	err = h(job, opt)
 	require.Error(t, err)
