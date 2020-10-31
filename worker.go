@@ -104,13 +104,18 @@ func (opt *JobOptions) Validate() error {
 }
 
 var (
+	// ErrDoNotRetry is returned if the job should not be retried;
+	// this may be because the job is unrecoverable, or because
+	// the handler has already rescheduled it.
+	ErrDoNotRetry = errors.New("do not retry")
+
 	// ErrQueueNotFound is returned if the queue is not yet
 	// defined with Register().
 	ErrQueueNotFound = errors.New("work: queue is not found")
 
 	// ErrUnrecoverable is returned if the error is unrecoverable.
 	// The job will be discarded.
-	ErrUnrecoverable = errors.New("work: permanent error")
+	ErrUnrecoverable = fmt.Errorf("work: permanent error%w", ErrDoNotRetry)
 
 	// ErrUnsupported is returned if it is not implemented.
 	ErrUnsupported = errors.New("work: unsupported")
@@ -355,7 +360,7 @@ func retry(queue Queue) HandleMiddleware {
 	return func(f HandleFunc) HandleFunc {
 		return func(job *Job, opt *DequeueOptions) error {
 			err := f(job, opt)
-			if err != nil && err != ErrUnrecoverable {
+			if err != nil && !errors.Is(err, ErrDoNotRetry) {
 				now := time.Now()
 				job.Retries++
 				job.LastError = err.Error()
@@ -376,6 +381,9 @@ func retry(queue Queue) HandleMiddleware {
 					Namespace: opt.Namespace,
 					QueueID:   opt.QueueID,
 				})
+				return err
+			}
+			if err != ErrUnrecoverable {
 				return err
 			}
 			return nil

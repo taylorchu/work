@@ -356,6 +356,15 @@ func TestRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, z, 0)
 
+	h = retrier(func(*Job, *DequeueOptions) error {
+		return fmt.Errorf("recoverable, but not retried%w", ErrDoNotRetry)
+	})
+	err = h(job, opt)
+	require.Error(t, err)
+
+	require.EqualValues(t, 0, job.Retries)
+	require.Equal(t, "", job.LastError)
+
 	var delays []int64
 	for i := 1; i <= 10; i++ {
 		retryErr := fmt.Errorf("error %d", i)
