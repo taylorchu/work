@@ -45,7 +45,7 @@ func main() {
 			discard.After(time.Hour),
 		},
 	}
-	w.Register("cmd_queue", func(job *work.Job, opts *work.DequeueOptions) error {
+	w.RegisterWithContext("cmd_queue", func(ctx context.Context, job *work.Job, opts *work.DequeueOptions) error {
 		var cmd []string
 		err := job.UnmarshalPayload(&cmd)
 		if err != nil {
@@ -54,9 +54,6 @@ func main() {
 		if len(cmd) == 0 {
 			return nil
 		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), jobOpts.MaxExecutionTime)
-		defer cancel()
 
 		fmt.Println(cmd)
 		err = exec.CommandContext(ctx, cmd[0], cmd[1:]...).Run()
