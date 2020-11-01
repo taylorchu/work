@@ -13,6 +13,7 @@ type redisQueue struct {
 	enqueueScript *redis.Script
 	dequeueScript *redis.Script
 	ackScript     *redis.Script
+	findScript    *redis.Script
 }
 
 // NewRedisQueue creates a new queue stored in redis.
@@ -106,11 +107,25 @@ func NewRedisQueue(client redis.UniversalClient) Queue {
 	return redis.call("zrem", queue_key, unpack(zrem_args))
 	`)
 
+	findScript := redis.NewScript(`
+	local ns = ARGV[1]
+	local ret = {}
+	for i = 2,table.getn(ARGV) do
+		local job_id = ARGV[i]
+		local job_key = table.concat({ns, "job", job_id}, ":")
+		local jobm = redis.call("hget", job_key, "msgpack")
+
+		table.insert(ret, jobm)
+	end
+	return ret
+	`)
+
 	return &redisQueue{
 		client:        client,
 		enqueueScript: enqueueScript,
 		dequeueScript: dequeueScript,
 		ackScript:     ackScript,
+		findScript:    findScript,
 	}
 }
 
@@ -201,10 +216,44 @@ func (q *redisQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
 	return q.ackScript.Run(q.client, nil, args...).Err()
 }
 
+func (q *redisQueue) BulkFind(jobIDs []string, opt *FindOptions) ([]*Job, error) {
+	err := opt.Validate()
+	if err != nil {
+		return nil, err
+	}
+	if len(jobIDs) == 0 {
+		return nil, nil
+	}
+	args := make([]interface{}, 1+len(jobIDs))
+	args[0] = opt.Namespace
+	for i, jobID := range jobIDs {
+		args[1+i] = jobID
+	}
+	res, err := q.findScript.Run(q.client, nil, args...).Result()
+	if err != nil {
+		return nil, err
+	}
+	jobm := res.([]interface{})
+	jobs := make([]*Job, len(jobm))
+	for i, iface := range jobm {
+		switch payload := iface.(type) {
+		case string:
+			var job Job
+			err := unmarshal(strings.NewReader(payload), &job)
+			if err != nil {
+				return nil, err
+			}
+			jobs[i] = &job
+		}
+	}
+	return jobs, nil
+}
+
 var (
 	_ MetricsExporter = (*redisQueue)(nil)
 	_ BulkEnqueuer    = (*redisQueue)(nil)
 	_ BulkDequeuer    = (*redisQueue)(nil)
+	_ BulkJobFinder   = (*redisQueue)(nil)
 )
 
 func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, error) {

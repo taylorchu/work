@@ -216,3 +216,24 @@ type BulkDequeuer interface {
 	BulkDequeue(int64, *DequeueOptions) ([]*Job, error)
 	BulkAck([]*Job, *AckOptions) error
 }
+
+// FindOptions specifies how a job is searched from a queue.
+type FindOptions struct {
+	Namespace string
+}
+
+// Validate validates FindOptions.
+func (opt *FindOptions) Validate() error {
+	if opt.Namespace == "" {
+		return ErrEmptyNamespace
+	}
+	return nil
+}
+
+// BulkJobFinder finds jobs by ids.
+// It allows third-party tools to get job status, or modify job by re-enqueue.
+// It returns nil if the job is no longer in the queue.
+// The length of the returned job list will be equal to the length of jobIDs.
+type BulkJobFinder interface {
+	BulkFind(jobIDs []string, opts *FindOptions) ([]*Job, error)
+}
