@@ -47,6 +47,29 @@ func TestRedisQueueEnqueue(t *testing.T) {
 		"msgpack": string(jobm),
 	}, h)
 
+	jobs, err := q.(BulkJobFinder).BulkFind([]string{job.ID, "not-exist-id"}, &FindOptions{
+		Namespace: "ns1",
+	})
+	require.NoError(t, err)
+	require.Len(t, jobs, 2)
+	require.Equal(t, job.ID, jobs[0].ID)
+	require.Equal(t, "", jobs[0].LastError)
+	require.Nil(t, jobs[1])
+
+	jobs[0].LastError = "hello world"
+	err = q.Enqueue(jobs[0], &EnqueueOptions{
+		Namespace: "ns1",
+		QueueID:   "q1",
+	})
+	require.NoError(t, err)
+	jobs, err = q.(BulkJobFinder).BulkFind([]string{job.ID}, &FindOptions{
+		Namespace: "ns1",
+	})
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	require.Equal(t, job.ID, jobs[0].ID)
+	require.Equal(t, "hello world", jobs[0].LastError)
+
 	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
