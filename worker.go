@@ -1,6 +1,7 @@
 package work
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime/debug"
@@ -24,6 +25,9 @@ type EnqueueMiddleware func(EnqueueFunc) EnqueueFunc
 
 // HandleFunc runs a job.
 type HandleFunc func(*Job, *DequeueOptions) error
+
+// ContextHandleFunc runs a job.
+type ContextHandleFunc func(context.Context, *Job, *DequeueOptions) error
 
 // HandleMiddleware modifies HandleFunc hehavior.
 type HandleMiddleware func(HandleFunc) HandleFunc
@@ -129,6 +133,16 @@ func (w *Worker) Register(queueID string, h HandleFunc, opt *JobOptions) error {
 		JobOptions: *opt,
 	}
 	return nil
+}
+
+// RegisterWithContext adds handler for a queue with context.Context.
+// The context is created with context.WithTimeout set from MaxExecutionTime.
+func (w *Worker) RegisterWithContext(queueID string, h ContextHandleFunc, opt *JobOptions) error {
+	return w.Register(queueID, func(job *Job, o *DequeueOptions) error {
+		ctx, cancel := context.WithTimeout(context.Background(), opt.MaxExecutionTime)
+		defer cancel()
+		return h(ctx, job, o)
+	}, opt)
 }
 
 // Start starts the worker.
