@@ -27,6 +27,7 @@ func main() {
 		log.Fatalln(err)
 	}
 	redisClient := redis.NewClient(opt)
+	defer redisClient.Close()
 
 	w := work.NewWorker(&work.WorkerOptions{
 		Namespace: *namespace,

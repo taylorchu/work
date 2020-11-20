@@ -18,6 +18,7 @@ func main() {
 		log.Fatalln(err)
 	}
 	redisClient := redis.NewClient(opt)
+	defer redisClient.Close()
 
 	queue := work.NewRedisQueue(redisClient)
 
