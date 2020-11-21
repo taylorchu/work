@@ -26,7 +26,6 @@ type sidekiqJob struct {
 	Args         json.RawMessage `json:"args"`
 	CreatedAt    float64         `json:"created_at"`
 	EnqueuedAt   float64         `json:"enqueued_at,omitempty"`
-	At           float64         `json:"at,omitempty"`
 	Queue        string          `json:"queue,omitempty"`
 	Retry        json.RawMessage `json:"retry,omitempty"`
 	RetryCount   int64           `json:"retry_count,omitempty"`
@@ -171,7 +170,6 @@ func newSidekiqJob(job *work.Job, sqQueue, sqClass string) (*sidekiqJob, error) 
 		Args:         job.Payload,
 		CreatedAt:    float64(job.CreatedAt.Unix()),
 		EnqueuedAt:   float64(job.EnqueuedAt.Unix()),
-		At:           float64(job.EnqueuedAt.Unix()),
 		Queue:        sqQueue,
 		Retry:        []byte("true"),
 		RetryCount:   job.Retries,

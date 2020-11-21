@@ -60,7 +60,7 @@ func TestSidekiqQueueEnqueueExternal(t *testing.T) {
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 1)
-	require.Equal(t, `{"class":"TestWorker","jid":"0e821cf2-d0cc-11e9-92f2-d059e4b80cfc","args":[1,2,3],"created_at":1567791044,"enqueued_at":1567791044,"at":1567791044,"queue":"import","retry":true}`, z[0].Member)
+	require.Equal(t, `{"class":"TestWorker","jid":"0e821cf2-d0cc-11e9-92f2-d059e4b80cfc","args":[1,2,3],"created_at":1567791044,"enqueued_at":1567791044,"queue":"import","retry":true}`, z[0].Member)
 	require.EqualValues(t, 1567791044, z[0].Score)
 }
 
