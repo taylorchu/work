@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
+	"github.com/cenkalti/backoff/v4"
 )
 
 // DequeueFunc generates a job.
@@ -387,10 +387,13 @@ func retry(queue Queue) HandleMiddleware {
 				job.LastError = err.Error()
 				job.UpdatedAt = now
 
+				// https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md
 				b := backoff.NewExponentialBackOff()
-				b.InitialInterval = time.Duration(opt.InvisibleSec) * time.Second
-				b.MaxInterval = 24 * time.Hour
-				b.RandomizationFactor = 0.1
+				b.InitialInterval = 2 * time.Second
+				b.RandomizationFactor = 0.2
+				b.Multiplier = 1.6
+				b.MaxInterval = 120 * time.Second
+				b.MaxElapsedTime = 0
 				b.Reset()
 
 				var next time.Duration
