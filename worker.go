@@ -392,7 +392,7 @@ func retry(queue Queue) HandleMiddleware {
 				b.InitialInterval = 2 * time.Second
 				b.RandomizationFactor = 0.2
 				b.Multiplier = 1.6
-				b.MaxInterval = 120 * time.Second
+				b.MaxInterval = 24 * time.Hour
 				b.MaxElapsedTime = 0
 				b.Reset()
 
