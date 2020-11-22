@@ -3,7 +3,7 @@ module github.com/taylorchu/work
 go 1.15
 
 require (
-	github.com/cenkalti/backoff/v4 v4.1.0
+	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/go-redis/redis/v7 v7.4.0
 	github.com/google/uuid v1.1.1
 	github.com/prometheus/client_golang v1.7.1
