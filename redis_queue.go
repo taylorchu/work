@@ -29,6 +29,13 @@ type RedisQueue interface {
 	MetricsExporter
 }
 
+// scriptKey returns a slice of strings containing at least one of the keys to
+// be used by a script. This allows Redis route our script execution to the
+// correct node in the event we're using a namespace.
+func scriptKey(ns, queueID string) []string {
+	return []string{strings.Join([]string{ns, "queue", queueID}, ":")}
+}
+
 // NewRedisQueue creates a new queue stored in redis.
 func NewRedisQueue(client redis.UniversalClient) RedisQueue {
 	enqueueScript := redis.NewScript(`
@@ -189,7 +196,7 @@ func (q *redisQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 		args[2+3*i+1] = job.ID
 		args[2+3*i+2] = jobm
 	}
-	return q.enqueueScript.Run(context.Background(), q.client, nil, args...).Err()
+	return q.enqueueScript.Run(context.Background(), q.client, scriptKey(opt.Namespace, opt.QueueID), args...).Err()
 }
 
 func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
@@ -205,7 +212,7 @@ func (q *redisQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, erro
 	if err != nil {
 		return nil, err
 	}
-	res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
+	res, err := q.dequeueScript.Run(context.Background(), q.client, scriptKey(opt.Namespace, opt.QueueID),
 		opt.Namespace,
 		opt.QueueID,
 		opt.At.Unix(),
@@ -249,7 +256,7 @@ func (q *redisQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
 	for i, job := range jobs {
 		args[2+i] = job.ID
 	}
-	return q.ackScript.Run(context.Background(), q.client, nil, args...).Err()
+	return q.ackScript.Run(context.Background(), q.client, scriptKey(opt.Namespace, opt.QueueID), args...).Err()
 }
 
 func (q *redisQueue) BulkFind(jobIDs []string, opt *FindOptions) ([]*Job, error) {
@@ -265,7 +272,7 @@ func (q *redisQueue) BulkFind(jobIDs []string, opt *FindOptions) ([]*Job, error)
 	for i, jobID := range jobIDs {
 		args[1+i] = jobID
 	}
-	res, err := q.findScript.Run(context.Background(), q.client, nil, args...).Result()
+	res, err := q.findScript.Run(context.Background(), q.client, scriptKey(opt.Namespace, jobIDs[0]), args...).Result()
 	if err != nil {
 		return nil, err
 	}
