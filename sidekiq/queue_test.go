@@ -40,9 +40,11 @@ func TestSidekiqQueueEnqueueExternal(t *testing.T) {
 	q := NewQueue(client)
 	job := work.NewJob()
 	job.ID = "0e821cf2-d0cc-11e9-92f2-d059e4b80cfc"
-	job.CreatedAt = time.Unix(1567791044, 0)
-	job.UpdatedAt = time.Unix(1567791044, 0)
+	job.CreatedAt = time.Unix(1567791042, 0)
+	job.UpdatedAt = time.Unix(1567791043, 0)
 	job.EnqueuedAt = time.Unix(1567791044, 0)
+	job.LastError = "error: test"
+	job.Retries = 2
 
 	err := job.MarshalJSONPayload([]int{1, 2, 3})
 	require.NoError(t, err)
@@ -60,7 +62,7 @@ func TestSidekiqQueueEnqueueExternal(t *testing.T) {
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 1)
-	require.Equal(t, `{"class":"TestWorker","jid":"0e821cf2-d0cc-11e9-92f2-d059e4b80cfc","args":[1,2,3],"created_at":1567791044,"enqueued_at":1567791044,"queue":"import","retry":true}`, z[0].Member)
+	require.Equal(t, `{"class":"TestWorker","jid":"0e821cf2-d0cc-11e9-92f2-d059e4b80cfc","args":[1,2,3],"created_at":1567791042,"enqueued_at":1567791044,"queue":"import","retry":true,"retry_count":2,"error_message":"error: test","error_class":"StandardError","failed_at":1567791043,"retried_at":1567791043}`, z[0].Member)
 	require.EqualValues(t, 1567791044, z[0].Score)
 }
 
@@ -68,7 +70,7 @@ func TestSidekiqQueueDequeueExternal(t *testing.T) {
 	client := newRedisClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
-	err := client.LPush("sidekiq:queue:default", `{"class":"TestWorker","args":[],"retry":3,"queue":"default","backtrace":true,"jid":"83b27ea26dd65821239ca6aa","created_at":1567788643.0875323,"enqueued_at":1567788643.0879307}"`).Err()
+	err := client.LPush("sidekiq:queue:default", `{"class":"TestWorker","args":[],"retry":3,"queue":"default","backtrace":true,"jid":"83b27ea26dd65821239ca6aa","created_at":1567788641.0875323,"enqueued_at":1567788642.0879307,"retry_count":2,"error_message":"error: test","error_class":"StandardError","failed_at":1567791043,"retried_at":1567791046}"`).Err()
 	require.NoError(t, err)
 
 	q := NewQueue(client)
@@ -80,9 +82,11 @@ func TestSidekiqQueueDequeueExternal(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "83b27ea26dd65821239ca6aa", job.ID)
-	require.EqualValues(t, 1567788643, job.CreatedAt.Unix())
-	require.EqualValues(t, 1567788643, job.UpdatedAt.Unix())
-	require.EqualValues(t, 1567788643, job.EnqueuedAt.Unix())
+	require.EqualValues(t, 1567788641, job.CreatedAt.Unix())
+	require.EqualValues(t, 1567791046, job.UpdatedAt.Unix())
+	require.EqualValues(t, 1567788642, job.EnqueuedAt.Unix())
+	require.EqualValues(t, 2, job.Retries)
+	require.Equal(t, "error: test", job.LastError)
 	require.EqualValues(t, "[]", job.Payload)
 }
 

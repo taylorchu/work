@@ -357,7 +357,7 @@ func TestRetry(t *testing.T) {
 	require.Len(t, z, 0)
 
 	h = retrier(func(*Job, *DequeueOptions) error {
-		return fmt.Errorf("recoverable, but not retried%w", ErrDoNotRetry)
+		return fmt.Errorf("recoverable, but not retried: %w", ErrDoNotRetry)
 	})
 	err = h(job, opt)
 	require.Error(t, err)
@@ -393,6 +393,6 @@ func TestRetry(t *testing.T) {
 	t.Log("delay", delays)
 	for i := 1; i < len(delays); i++ {
 		require.True(t, delays[i] > delays[i-1])
-		require.True(t, delays[i] > opt.InvisibleSec)
+		require.True(t, delays[i] > 1)
 	}
 }

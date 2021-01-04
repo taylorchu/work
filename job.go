@@ -32,12 +32,21 @@ type Job struct {
 	LastError string `msgpack:"last_error"`
 }
 
+// InvalidJobPayloadError wraps json or msgpack decoding error.
+type InvalidJobPayloadError struct {
+	Err error
+}
+
+func (e *InvalidJobPayloadError) Error() string {
+	return fmt.Sprintf("work: invalid job payload: %v", e.Err)
+}
+
 // UnmarshalPayload decodes the msgpack payload into a variable.
 func (j *Job) UnmarshalPayload(v interface{}) error {
 	// used in middleware/discard package.
 	err := unmarshal(bytes.NewReader(j.Payload), v)
 	if err != nil {
-		return fmt.Errorf("work: invalid job payload: %s", err)
+		return &InvalidJobPayloadError{Err: err}
 	}
 	return nil
 }
@@ -47,7 +56,7 @@ func (j *Job) UnmarshalJSONPayload(v interface{}) error {
 	// used in middleware/discard package.
 	err := json.Unmarshal(j.Payload, v)
 	if err != nil {
-		return fmt.Errorf("work: invalid job payload: %s", err)
+		return &InvalidJobPayloadError{Err: err}
 	}
 	return nil
 }
@@ -206,4 +215,25 @@ type BulkEnqueuer interface {
 type BulkDequeuer interface {
 	BulkDequeue(int64, *DequeueOptions) ([]*Job, error)
 	BulkAck([]*Job, *AckOptions) error
+}
+
+// FindOptions specifies how a job is searched from a queue.
+type FindOptions struct {
+	Namespace string
+}
+
+// Validate validates FindOptions.
+func (opt *FindOptions) Validate() error {
+	if opt.Namespace == "" {
+		return ErrEmptyNamespace
+	}
+	return nil
+}
+
+// BulkJobFinder finds jobs by ids.
+// It allows third-party tools to get job status, or modify job by re-enqueue.
+// It returns nil if the job is no longer in the queue.
+// The length of the returned job list will be equal to the length of jobIDs.
+type BulkJobFinder interface {
+	BulkFind(jobIDs []string, opts *FindOptions) ([]*Job, error)
 }
