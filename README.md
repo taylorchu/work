@@ -16,7 +16,8 @@ Please see `cmd/` for enqueuer and worker demo.
     - [Interesting read](https://kirshatrov.com/2018/07/20/redis-job-queue/)
 - [x] modular
     - The core only catches panics, retries on failure, and waits if a queue is empty.
-    - All other functionalities are either removed or moved to separate middlewares.
+    - All other [functionalities](https://kirshatrov.com/2019/01/03/state-of-background-jobs/)
+      are either removed or moved to separate middlewares.
 - [x] support binary payload/args with message pack.
 - [x] replace built-in UI with prometheus metrics (use grafana if you want dashboard).
 - [x] additional optimizations (alloc + bulk queue ops)
