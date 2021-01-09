@@ -1,3 +1,4 @@
+*.conf
 *.rdb
 cmd/worker/worker
 cmd/enqueuer/enqueuer
