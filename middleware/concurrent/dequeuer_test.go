@@ -8,18 +8,11 @@ import (
 	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
+	"github.com/taylorchu/work/redistest"
 )
 
-func newRedisClient() *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
-		PoolSize:     10,
-		MinIdleConns: 10,
-	})
-}
-
 func TestDequeuer(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 
@@ -140,7 +133,7 @@ func TestDequeuer(t *testing.T) {
 func BenchmarkConcurrency(b *testing.B) {
 	b.StopTimer()
 
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(b, client.FlushAll().Err())
 

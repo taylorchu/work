@@ -9,16 +9,9 @@ import (
 	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
+	"github.com/taylorchu/work/redistest"
 	"github.com/vmihailenco/msgpack/v4"
 )
-
-func newRedisClient() *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
-		PoolSize:     10,
-		MinIdleConns: 10,
-	})
-}
 
 func marshal(v interface{}) ([]byte, error) {
 	var buf bytes.Buffer
@@ -33,7 +26,7 @@ func marshal(v interface{}) ([]byte, error) {
 }
 
 func TestSidekiqQueueEnqueueExternal(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 
@@ -67,7 +60,7 @@ func TestSidekiqQueueEnqueueExternal(t *testing.T) {
 }
 
 func TestSidekiqQueueDequeueExternal(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	err := client.LPush("sidekiq:queue:default", `{"class":"TestWorker","args":[],"retry":3,"queue":"default","backtrace":true,"jid":"83b27ea26dd65821239ca6aa","created_at":1567788641.0875323,"enqueued_at":1567788642.0879307,"retry_count":2,"error_message":"error: test","error_class":"StandardError","failed_at":1567791043,"retried_at":1567791046}"`).Err()
@@ -91,7 +84,7 @@ func TestSidekiqQueueDequeueExternal(t *testing.T) {
 }
 
 func TestSidekiqQueueEnqueue(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewQueue(client)
@@ -164,7 +157,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 }
 
 func TestSidekiqQueueDequeue(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewQueue(client)
@@ -246,7 +239,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 }
 
 func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewQueue(client)
@@ -303,7 +296,7 @@ func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
 }
 
 func TestSidekiqQueueAck(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewQueue(client)
@@ -370,7 +363,7 @@ func TestSidekiqQueueAck(t *testing.T) {
 }
 
 func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewQueue(client)

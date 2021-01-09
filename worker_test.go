@@ -9,10 +9,11 @@ import (
 
 	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
+	"github.com/taylorchu/work/redistest"
 )
 
 func TestWorkerStartStop(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 
@@ -37,7 +38,7 @@ func TestWorkerStartStop(t *testing.T) {
 }
 
 func TestWorkerExportMetrics(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 
@@ -92,7 +93,7 @@ func waitEmpty(client redis.UniversalClient, key string, timeout time.Duration) 
 }
 
 func TestWorkerRunJobMultiQueue(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 
@@ -186,7 +187,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 }
 
 func TestWorkerRunJob(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 
@@ -328,7 +329,7 @@ func TestWorkerRunJob(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 

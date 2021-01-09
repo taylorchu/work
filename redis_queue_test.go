@@ -7,18 +7,11 @@ import (
 
 	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
+	"github.com/taylorchu/work/redistest"
 )
 
-func newRedisClient() *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
-		PoolSize:     10,
-		MinIdleConns: 10,
-	})
-}
-
 func TestRedisQueueEnqueue(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewRedisQueue(client)
@@ -98,7 +91,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 }
 
 func TestRedisQueueDequeue(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewRedisQueue(client)
@@ -178,7 +171,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 }
 
 func TestRedisQueueDequeueDeletedJob(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewRedisQueue(client)
@@ -227,7 +220,7 @@ func TestRedisQueueDequeueDeletedJob(t *testing.T) {
 }
 
 func TestRedisQueueAck(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewRedisQueue(client)
@@ -282,7 +275,7 @@ func TestRedisQueueAck(t *testing.T) {
 }
 
 func TestRedisQueueGetQueueMetrics(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, client.FlushAll().Err())
 	q := NewRedisQueue(client)
