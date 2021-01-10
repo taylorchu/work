@@ -9,6 +9,44 @@ jobs:
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
+      - run: dockerize -wait tcp://:6379
+      - run: go test -p 1 -v ./...
+  redis5-cluster:
+    docker:
+      - image: circleci/golang:1.15
+        environment:
+          - GO111MODULE=on
+          - REDIS_ADDR=:7000,:7001,:7002
+      - image: redis:5.0-alpine
+        command:
+          - --cluster-enabled
+          - "yes"
+          - --port
+          - "7000"
+          - --cluster-config-file
+          - 7000.conf
+      - image: redis:5.0-alpine
+        command:
+          - --cluster-enabled
+          - "yes"
+          - --port
+          - "7001"
+          - --cluster-config-file
+          - 7001.conf
+      - image: redis:5.0-alpine
+        command:
+          - --cluster-enabled
+          - "yes"
+          - --port
+          - "7002"
+          - --cluster-config-file
+          - 7002.conf
+    working_directory: /go/src/github.com/taylorchu/work
+    steps:
+      - checkout
+      - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
+      - run: sudo apt-get install redis-tools
+      - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002
       - run: go test -p 1 -v ./...
   redis6:
     docker:
@@ -19,6 +57,44 @@ jobs:
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
+      - run: dockerize -wait tcp://:6379
+      - run: go test -p 1 -v ./...
+  redis6-cluster:
+    docker:
+      - image: circleci/golang:1.15
+        environment:
+          - GO111MODULE=on
+          - REDIS_ADDR=:7000,:7001,:7002
+      - image: redis:6.0-alpine
+        command:
+          - --cluster-enabled
+          - "yes"
+          - --port
+          - "7000"
+          - --cluster-config-file
+          - 7000.conf
+      - image: redis:6.0-alpine
+        command:
+          - --cluster-enabled
+          - "yes"
+          - --port
+          - "7001"
+          - --cluster-config-file
+          - 7001.conf
+      - image: redis:6.0-alpine
+        command:
+          - --cluster-enabled
+          - "yes"
+          - --port
+          - "7002"
+          - --cluster-config-file
+          - 7002.conf
+    working_directory: /go/src/github.com/taylorchu/work
+    steps:
+      - checkout
+      - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
+      - run: sudo apt-get install redis-tools
+      - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002
       - run: go test -p 1 -v ./...
   keydb:
     docker:
@@ -29,6 +105,7 @@ jobs:
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
+      - run: dockerize -wait tcp://:6379
       - run: go test -p 1 -v ./...
 workflows:
   version: 2
@@ -36,4 +113,6 @@ workflows:
     jobs:
       - redis5
       - redis6
+      - redis5-cluster
+      - redis6-cluster
       - keydb

@@ -12,7 +12,7 @@ import (
 func TestAfter(t *testing.T) {
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
-		Namespace: "n1",
+		Namespace: "{ns1}",
 		QueueID:   "q1",
 	}
 	d := After(time.Minute)

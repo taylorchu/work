@@ -9,15 +9,16 @@ import (
 
 	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
+	"github.com/taylorchu/work/redistest"
 )
 
 func TestWorkerStartStop(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, client.FlushAll().Err())
+	require.NoError(t, redistest.Reset(client))
 
 	w := NewWorker(&WorkerOptions{
-		Namespace: "ns1",
+		Namespace: "{ns1}",
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("test",
@@ -37,12 +38,12 @@ func TestWorkerStartStop(t *testing.T) {
 }
 
 func TestWorkerExportMetrics(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, client.FlushAll().Err())
+	require.NoError(t, redistest.Reset(client))
 
 	w := NewWorker(&WorkerOptions{
-		Namespace: "ns1",
+		Namespace: "{ns1}",
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("test",
@@ -58,7 +59,7 @@ func TestWorkerExportMetrics(t *testing.T) {
 	all, err := w.ExportMetrics()
 	require.NoError(t, err)
 	require.Len(t, all.Queue, 1)
-	require.Equal(t, all.Queue[0].Namespace, "ns1")
+	require.Equal(t, all.Queue[0].Namespace, "{ns1}")
 	require.Equal(t, all.Queue[0].QueueID, "test")
 }
 
@@ -92,16 +93,16 @@ func waitEmpty(client redis.UniversalClient, key string, timeout time.Duration) 
 }
 
 func TestWorkerRunJobMultiQueue(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, client.FlushAll().Err())
+	require.NoError(t, redistest.Reset(client))
 
 	type message struct {
 		Text string
 	}
 
 	w := NewWorker(&WorkerOptions{
-		Namespace: "ns1",
+		Namespace: "{ns1}",
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("test1",
@@ -143,7 +144,7 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		require.NoError(t, err)
 
 		err = w.opt.Queue.Enqueue(job, &EnqueueOptions{
-			Namespace: "ns1",
+			Namespace: "{ns1}",
 			QueueID:   "test1",
 		})
 		require.NoError(t, err)
@@ -155,43 +156,43 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		require.NoError(t, err)
 
 		err = w.opt.Queue.Enqueue(job, &EnqueueOptions{
-			Namespace: "ns1",
+			Namespace: "{ns1}",
 			QueueID:   "test2",
 		})
 		require.NoError(t, err)
 	}
 
-	count, err := client.ZCard("ns1:queue:test1").Result()
+	count, err := client.ZCard("{ns1}:queue:test1").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
-	count, err = client.ZCard("ns1:queue:test2").Result()
+	count, err = client.ZCard("{ns1}:queue:test2").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
 	w.Start()
-	err = waitEmpty(client, "ns1:queue:test1", 10*time.Second)
+	err = waitEmpty(client, "{ns1}:queue:test1", 10*time.Second)
 	require.NoError(t, err)
-	err = waitEmpty(client, "ns1:queue:test2", 10*time.Second)
+	err = waitEmpty(client, "{ns1}:queue:test2", 10*time.Second)
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err = client.ZCard("ns1:queue:test1").Result()
+	count, err = client.ZCard("{ns1}:queue:test1").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, count)
 
-	count, err = client.ZCard("ns1:queue:test2").Result()
+	count, err = client.ZCard("{ns1}:queue:test2").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, count)
 }
 
 func TestWorkerRunJob(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, client.FlushAll().Err())
+	require.NoError(t, redistest.Reset(client))
 
 	w := NewWorker(&WorkerOptions{
-		Namespace: "ns1",
+		Namespace: "{ns1}",
 		Queue:     NewRedisQueue(client),
 	})
 	err := w.Register("success",
@@ -233,22 +234,22 @@ func TestWorkerRunJob(t *testing.T) {
 		require.NoError(t, err)
 
 		err = w.opt.Queue.Enqueue(job, &EnqueueOptions{
-			Namespace: "ns1",
+			Namespace: "{ns1}",
 			QueueID:   "success",
 		})
 		require.NoError(t, err)
 	}
 
-	count, err := client.ZCard("ns1:queue:success").Result()
+	count, err := client.ZCard("{ns1}:queue:success").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
 	w.Start()
-	err = waitEmpty(client, "ns1:queue:success", 10*time.Second)
+	err = waitEmpty(client, "{ns1}:queue:success", 10*time.Second)
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err = client.ZCard("ns1:queue:success").Result()
+	count, err = client.ZCard("{ns1}:queue:success").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, count)
 
@@ -258,28 +259,28 @@ func TestWorkerRunJob(t *testing.T) {
 		require.NoError(t, err)
 
 		err = w.opt.Queue.Enqueue(job, &EnqueueOptions{
-			Namespace: "ns1",
+			Namespace: "{ns1}",
 			QueueID:   "failure",
 		})
 		require.NoError(t, err)
 	}
 
-	count, err = client.ZCard("ns1:queue:failure").Result()
+	count, err = client.ZCard("{ns1}:queue:failure").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
 	w.Start()
-	err = waitEmpty(client, "ns1:queue:failure", 10*time.Second)
+	err = waitEmpty(client, "{ns1}:queue:failure", 10*time.Second)
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err = client.ZCard("ns1:queue:failure").Result()
+	count, err = client.ZCard("{ns1}:queue:failure").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
 	for i := 0; i < 3; i++ {
 		job, err := NewRedisQueue(client).Dequeue(&DequeueOptions{
-			Namespace:    "ns1",
+			Namespace:    "{ns1}",
 			QueueID:      "failure",
 			At:           time.Now().Add(time.Hour),
 			InvisibleSec: 3600,
@@ -295,28 +296,28 @@ func TestWorkerRunJob(t *testing.T) {
 		require.NoError(t, err)
 
 		err = w.opt.Queue.Enqueue(job, &EnqueueOptions{
-			Namespace: "ns1",
+			Namespace: "{ns1}",
 			QueueID:   "panic",
 		})
 		require.NoError(t, err)
 	}
 
-	count, err = client.ZCard("ns1:queue:panic").Result()
+	count, err = client.ZCard("{ns1}:queue:panic").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
 	w.Start()
-	err = waitEmpty(client, "ns1:queue:panic", 10*time.Second)
+	err = waitEmpty(client, "{ns1}:queue:panic", 10*time.Second)
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err = client.ZCard("ns1:queue:panic").Result()
+	count, err = client.ZCard("{ns1}:queue:panic").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
 	for i := 0; i < 3; i++ {
 		job, err := NewRedisQueue(client).Dequeue(&DequeueOptions{
-			Namespace:    "ns1",
+			Namespace:    "{ns1}",
 			QueueID:      "panic",
 			At:           time.Now().Add(time.Hour),
 			InvisibleSec: 3600,
@@ -328,13 +329,13 @@ func TestWorkerRunJob(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, client.FlushAll().Err())
+	require.NoError(t, redistest.Reset(client))
 
 	job := NewJob()
 	opt := &DequeueOptions{
-		Namespace:    "ns1",
+		Namespace:    "{ns1}",
 		QueueID:      "q1",
 		InvisibleSec: 10,
 	}
@@ -348,7 +349,7 @@ func TestRetry(t *testing.T) {
 	require.EqualValues(t, 0, job.Retries)
 	require.Equal(t, "", job.LastError)
 
-	z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
+	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -378,7 +379,7 @@ func TestRetry(t *testing.T) {
 		require.EqualValues(t, i, job.Retries)
 		require.Equal(t, retryErr.Error(), job.LastError)
 
-		z, err := client.ZRangeByScoreWithScores("ns1:queue:q1",
+		z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
 			&redis.ZRangeBy{
 				Min: "-inf",
 				Max: "+inf",

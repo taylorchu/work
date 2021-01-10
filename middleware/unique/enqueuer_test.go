@@ -4,23 +4,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
+	"github.com/taylorchu/work/redistest"
 )
 
-func newRedisClient() *redis.Client {
-	return redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
-		PoolSize:     10,
-		MinIdleConns: 10,
-	})
-}
-
 func TestEnqueuerBypass(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, client.FlushAll().Err())
+	require.NoError(t, redistest.Reset(client))
 
 	enq := Enqueuer(&EnqueuerOptions{
 		Client: client,
@@ -37,7 +29,7 @@ func TestEnqueuerBypass(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		job := work.NewJob()
 		err := h(job, &work.EnqueueOptions{
-			Namespace: "n1",
+			Namespace: "{ns1}",
 			QueueID:   "q1",
 		})
 		require.NoError(t, err)
@@ -46,9 +38,9 @@ func TestEnqueuerBypass(t *testing.T) {
 }
 
 func TestEnqueuer(t *testing.T) {
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, client.FlushAll().Err())
+	require.NoError(t, redistest.Reset(client))
 
 	enq := Enqueuer(&EnqueuerOptions{
 		Client: client,
@@ -65,7 +57,7 @@ func TestEnqueuer(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		job := work.NewJob()
 		err := h(job, &work.EnqueueOptions{
-			Namespace: "n1",
+			Namespace: "{ns1}",
 			QueueID:   "q1",
 		})
 		require.NoError(t, err)
@@ -73,10 +65,10 @@ func TestEnqueuer(t *testing.T) {
 	require.Equal(t, 1, called)
 
 	for i := 0; i < 3; i++ {
-		require.NoError(t, client.Del("n1:unique:q1:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08").Err())
+		require.NoError(t, client.Del("{ns1}:unique:q1:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08").Err())
 		job := work.NewJob()
 		err := h(job, &work.EnqueueOptions{
-			Namespace: "n1",
+			Namespace: "{ns1}",
 			QueueID:   "q1",
 		})
 		require.NoError(t, err)
@@ -87,9 +79,9 @@ func TestEnqueuer(t *testing.T) {
 func BenchmarkEnqueuer(b *testing.B) {
 	b.StopTimer()
 
-	client := newRedisClient()
+	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(b, client.FlushAll().Err())
+	require.NoError(b, redistest.Reset(client))
 
 	enq := Enqueuer(&EnqueuerOptions{
 		Client: client,
@@ -108,7 +100,7 @@ func BenchmarkEnqueuer(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		job := work.NewJob()
 		h(job, &work.EnqueueOptions{
-			Namespace: "n1",
+			Namespace: "{ns1}",
 			QueueID:   "q1",
 		})
 	}
