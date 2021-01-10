@@ -46,7 +46,7 @@ jobs:
       - checkout
       - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
       - run: sudo apt-get install redis-tools
-      - run: redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 --cluster-yes
+      - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002
       - run: go test -p 1 -v ./...
   redis6:
     docker:
@@ -94,7 +94,7 @@ jobs:
       - checkout
       - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
       - run: sudo apt-get install redis-tools
-      - run: redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 --cluster-yes
+      - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002
       - run: go test -p 1 -v ./...
   keydb:
     docker:
