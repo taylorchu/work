@@ -11,7 +11,7 @@ import (
 func TestHandleFuncLogger(t *testing.T) {
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
-		Namespace: "n1",
+		Namespace: "{ns1}",
 		QueueID:   "q1",
 	}
 	h := HandleFuncLogger(func(*work.Job, *work.DequeueOptions) error {
@@ -31,7 +31,7 @@ func TestHandleFuncLogger(t *testing.T) {
 func TestEnqueueFuncLogger(t *testing.T) {
 	job := work.NewJob()
 	opt := &work.EnqueueOptions{
-		Namespace: "n1",
+		Namespace: "{ns1}",
 		QueueID:   "q1",
 	}
 	h := EnqueueFuncLogger(func(*work.Job, *work.EnqueueOptions) error {

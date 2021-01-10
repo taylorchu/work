@@ -13,7 +13,7 @@ import (
 func TestHandleFuncMetrics(t *testing.T) {
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
-		Namespace: "n1",
+		Namespace: "{ns1}",
 		QueueID:   "q1",
 	}
 	h := HandleFuncMetrics(func(*work.Job, *work.DequeueOptions) error {
@@ -44,7 +44,7 @@ func TestHandleFuncMetrics(t *testing.T) {
 func TestEnqueueFuncMetrics(t *testing.T) {
 	job := work.NewJob()
 	opt := &work.EnqueueOptions{
-		Namespace: "n1",
+		Namespace: "{ns1}",
 		QueueID:   "q1",
 	}
 	h := EnqueueFuncMetrics(func(*work.Job, *work.EnqueueOptions) error {

@@ -10,7 +10,7 @@ import (
 func TestInvalidPayload(t *testing.T) {
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
-		Namespace: "n1",
+		Namespace: "{ns1}",
 		QueueID:   "q1",
 	}
 	h := InvalidPayload(func(*work.Job, *work.DequeueOptions) error {

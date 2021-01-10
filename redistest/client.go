@@ -21,3 +21,13 @@ func NewClient() redis.UniversalClient {
 		MinIdleConns: 10,
 	})
 }
+
+// Reset is used to clear redis for next test.
+func Reset(client redis.UniversalClient) error {
+	if cc, ok := client.(*redis.ClusterClient); ok {
+		return cc.ForEachMaster(func(c *redis.Client) error {
+			return c.FlushAll().Err()
+		})
+	}
+	return client.FlushAll().Err()
+}
