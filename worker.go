@@ -265,7 +265,7 @@ func (w *Worker) start(h handler) {
 				}
 				return nil
 			}()
-			if err != nil && err != ErrEmptyQueue && !errors.Is(err, ErrDoNotRetry) {
+			if err != nil && !errors.Is(err, ErrEmptyQueue) && !errors.Is(err, ErrDoNotRetry) {
 				errFunc(err)
 			}
 		}
@@ -346,7 +346,7 @@ func idleWait(d time.Duration, stop <-chan struct{}) DequeueMiddleware {
 		return func(opt *DequeueOptions) (*Job, error) {
 			job, err := f(opt)
 			if err != nil {
-				if err == ErrEmptyQueue {
+				if errors.Is(err, ErrEmptyQueue) {
 					select {
 					case <-time.After(d):
 					case <-stop:
@@ -375,7 +375,7 @@ func retry(queue Queue) HandleMiddleware {
 		return func(job *Job, opt *DequeueOptions) error {
 			err := f(job, opt)
 			if err != nil {
-				if err == ErrUnrecoverable {
+				if errors.Is(err, ErrUnrecoverable) {
 					return nil // ack
 				}
 				if errors.Is(err, ErrDoNotRetry) {
