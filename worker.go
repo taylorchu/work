@@ -141,6 +141,7 @@ func (w *Worker) Register(queueID string, h HandleFunc, opt *JobOptions) error {
 }
 
 // RegisterWithContext adds handler for a queue with context.Context.
+// queueID and namespace should be the same as the one used to enqueue.
 // The context is created with context.WithTimeout set from MaxExecutionTime.
 func (w *Worker) RegisterWithContext(queueID string, h ContextHandleFunc, opt *JobOptions) error {
 	return w.Register(queueID, func(job *Job, o *DequeueOptions) error {
