@@ -241,7 +241,7 @@ func (w *Worker) start(h handler) {
 				errFunc(err)
 			}
 		default:
-			err := func() error {
+			func() error {
 				opt := &DequeueOptions{
 					Namespace:    ns,
 					QueueID:      h.QueueID,
@@ -250,6 +250,9 @@ func (w *Worker) start(h handler) {
 				}
 				job, err := dequeue(opt)
 				if err != nil {
+					if !errors.Is(err, ErrEmptyQueue) {
+						errFunc(err)
+					}
 					return err
 				}
 				err = handle(job, opt)
@@ -261,14 +264,12 @@ func (w *Worker) start(h handler) {
 					// prevent un-acked job count to be too large
 					err := flush()
 					if err != nil {
+						errFunc(err)
 						return err
 					}
 				}
 				return nil
 			}()
-			if err != nil && !errors.Is(err, ErrEmptyQueue) && !errors.Is(err, ErrDoNotRetry) {
-				errFunc(err)
-			}
 		}
 	}
 }
