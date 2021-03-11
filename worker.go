@@ -34,7 +34,7 @@ type HandleMiddleware func(HandleFunc) HandleFunc
 
 type handler struct {
 	QueueID    string
-	HandleFunc HandleFunc
+	HandleFunc ContextHandleFunc
 	JobOptions JobOptions
 }
 
@@ -49,7 +49,7 @@ type WorkerOptions struct {
 type Worker struct {
 	opt WorkerOptions
 
-	stop       chan struct{}
+	cancel     func()
 	wg         sync.WaitGroup
 	handlerMap map[string]handler
 }
@@ -128,41 +128,44 @@ var (
 // Register adds handler for a queue.
 // queueID and namespace should be the same as the one used to enqueue.
 func (w *Worker) Register(queueID string, h HandleFunc, opt *JobOptions) error {
-	err := opt.Validate()
-	if err != nil {
-		return err
-	}
-	w.handlerMap[queueID] = handler{
-		QueueID:    queueID,
-		HandleFunc: h,
-		JobOptions: *opt,
-	}
-	return nil
+	return w.RegisterWithContext(queueID, func(ctx context.Context, job *Job, o *DequeueOptions) error {
+		return h(job, o)
+	}, opt)
 }
 
 // RegisterWithContext adds handler for a queue with context.Context.
 // queueID and namespace should be the same as the one used to enqueue.
 // The context is created with context.WithTimeout set from MaxExecutionTime.
 func (w *Worker) RegisterWithContext(queueID string, h ContextHandleFunc, opt *JobOptions) error {
-	return w.Register(queueID, func(job *Job, o *DequeueOptions) error {
-		ctx, cancel := context.WithTimeout(context.Background(), opt.MaxExecutionTime)
-		defer cancel()
-		return h(ctx, job, o)
-	}, opt)
+	err := opt.Validate()
+	if err != nil {
+		return err
+	}
+	w.handlerMap[queueID] = handler{
+		QueueID: queueID,
+		HandleFunc: func(ctx context.Context, job *Job, o *DequeueOptions) error {
+			ctx, cancel := context.WithTimeout(ctx, opt.MaxExecutionTime)
+			defer cancel()
+			return h(ctx, job, o)
+		},
+		JobOptions: *opt,
+	}
+	return nil
 }
 
 // Start starts the worker.
 func (w *Worker) Start() {
-	w.stop = make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	w.cancel = cancel
 	for _, h := range w.handlerMap {
 		for i := int64(0); i < h.JobOptions.NumGoroutines; i++ {
 			w.wg.Add(1)
-			go w.start(h)
+			go w.start(ctx, h)
 		}
 	}
 }
 
-func (w *Worker) start(h handler) {
+func (w *Worker) start(ctx context.Context, h handler) {
 	defer w.wg.Done()
 
 	queue := w.opt.Queue
@@ -186,9 +189,11 @@ func (w *Worker) start(h handler) {
 	for _, mw := range h.JobOptions.DequeueMiddleware {
 		dequeue = mw(dequeue)
 	}
-	dequeue = idleWait(h.JobOptions.IdleWait, w.stop)(dequeue)
+	dequeue = idleWait(ctx, h.JobOptions.IdleWait)(dequeue)
 
-	handle := h.HandleFunc
+	handle := func(job *Job, o *DequeueOptions) error {
+		return h.HandleFunc(ctx, job, o)
+	}
 	for _, mw := range h.JobOptions.HandleMiddleware {
 		handle = mw(handle)
 	}
@@ -233,7 +238,7 @@ func (w *Worker) start(h handler) {
 
 	for {
 		select {
-		case <-w.stop:
+		case <-ctx.Done():
 			return
 		case <-flushTicker.C:
 			err := flush()
@@ -339,11 +344,13 @@ func (w *Worker) ExportMetrics() (*Metrics, error) {
 
 // Stop stops the worker.
 func (w *Worker) Stop() {
-	close(w.stop)
+	if w.cancel != nil {
+		w.cancel()
+	}
 	w.wg.Wait()
 }
 
-func idleWait(d time.Duration, stop <-chan struct{}) DequeueMiddleware {
+func idleWait(ctx context.Context, d time.Duration) DequeueMiddleware {
 	return func(f DequeueFunc) DequeueFunc {
 		return func(opt *DequeueOptions) (*Job, error) {
 			job, err := f(opt)
@@ -351,7 +358,7 @@ func idleWait(d time.Duration, stop <-chan struct{}) DequeueMiddleware {
 				if errors.Is(err, ErrEmptyQueue) {
 					select {
 					case <-time.After(d):
-					case <-stop:
+					case <-ctx.Done():
 					}
 				}
 				return nil, err
