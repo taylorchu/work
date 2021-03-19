@@ -48,6 +48,36 @@ func TestSidekiqQueueEnqueueExternal(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	l, err := client.LRange("{sidekiq}:queue:import", 0, -1).Result()
+	require.NoError(t, err)
+	require.Len(t, l, 1)
+
+	require.Equal(t, `{"class":"TestWorker","jid":"0e821cf2-d0cc-11e9-92f2-d059e4b80cfc","args":[1,2,3],"created_at":1567791042,"enqueued_at":1567791044,"queue":"import","retry":true,"retry_count":2,"error_message":"error: test","error_class":"StandardError","failed_at":1567791043,"retried_at":1567791043}`, l[0])
+}
+
+func TestSidekiqQueueEnqueueExternalScheduled(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+
+	q := NewQueue(client)
+	job := work.NewJob()
+	job.ID = "0e821cf2-d0cc-11e9-92f2-d059e4b80cfc"
+	job.CreatedAt = time.Unix(91567791042, 0)
+	job.UpdatedAt = time.Unix(91567791043, 0)
+	job.EnqueuedAt = time.Unix(91567791044, 0)
+	job.LastError = "error: test"
+	job.Retries = 2
+
+	err := job.MarshalJSONPayload([]int{1, 2, 3})
+	require.NoError(t, err)
+
+	err = q.Enqueue(job, &work.EnqueueOptions{
+		Namespace: "{sidekiq}",
+		QueueID:   "import/TestWorker",
+	})
+	require.NoError(t, err)
+
 	z, err := client.ZRangeByScoreWithScores("{sidekiq}:schedule",
 		&redis.ZRangeBy{
 			Min: "-inf",
@@ -55,8 +85,8 @@ func TestSidekiqQueueEnqueueExternal(t *testing.T) {
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 1)
-	require.Equal(t, `{"class":"TestWorker","jid":"0e821cf2-d0cc-11e9-92f2-d059e4b80cfc","args":[1,2,3],"created_at":1567791042,"enqueued_at":1567791044,"queue":"import","retry":true,"retry_count":2,"error_message":"error: test","error_class":"StandardError","failed_at":1567791043,"retried_at":1567791043}`, z[0].Member)
-	require.EqualValues(t, 1567791044, z[0].Score)
+	require.Equal(t, `{"class":"TestWorker","jid":"0e821cf2-d0cc-11e9-92f2-d059e4b80cfc","args":[1,2,3],"created_at":91567791042,"enqueued_at":91567791044,"queue":"import","retry":true,"retry_count":2,"error_message":"error: test","error_class":"StandardError","failed_at":91567791043,"retried_at":91567791043}`, z[0].Member)
+	require.EqualValues(t, 91567791044, z[0].Score)
 }
 
 func TestSidekiqQueueDequeueExternal(t *testing.T) {
