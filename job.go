@@ -140,6 +140,12 @@ type Enqueuer interface {
 	Enqueue(*Job, *EnqueueOptions) error
 }
 
+// ExternalEnqueuer enqueues a job with other queue protocol.
+// Queue adaptor that implements this can publish jobs directly to other types of queue systems.
+type ExternalEnqueuer interface {
+	ExternalEnqueue(*Job, *EnqueueOptions) error
+}
+
 // DequeueOptions specifies how a job is dequeued.
 type DequeueOptions struct {
 	// Namespace is the namespace of a queue.
@@ -209,6 +215,12 @@ type Queue interface {
 // BulkEnqueuer enqueues jobs in a batch.
 type BulkEnqueuer interface {
 	BulkEnqueue([]*Job, *EnqueueOptions) error
+}
+
+// ExternalBulkEnqueuer enqueues jobs in a batch with other queue protocol.
+// Queue adaptor that implements this can publish jobs directly to other types of queue systems.
+type ExternalBulkEnqueuer interface {
+	ExternalBulkEnqueue([]*Job, *EnqueueOptions) error
 }
 
 // BulkDequeuer dequeues jobs in a batch.

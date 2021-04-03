@@ -229,79 +229,11 @@ func (q *sidekiqQueue) BulkEnqueue(jobs []*work.Job, opt *work.EnqueueOptions) e
 	if err != nil {
 		return err
 	}
-
-	now := time.Now()
-	readyJobs := make([]*work.Job, 0, len(jobs))
-	scheduledJobs := make([]*work.Job, 0, len(jobs))
-	for _, job := range jobs {
-		if job.EnqueuedAt.After(now) {
-			scheduledJobs = append(scheduledJobs, job)
-		} else {
-			readyJobs = append(readyJobs, job)
-		}
-	}
-
-	err = q.bulkEnqueue(readyJobs, opt)
-	if err != nil {
-		return err
-	}
-	err = q.bulkEnqueueIn(scheduledJobs, opt)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (q *sidekiqQueue) bulkEnqueue(jobs []*work.Job, opt *work.EnqueueOptions) error {
-	if len(jobs) == 0 {
-		return nil
-	}
-	sqQueue, sqClass := parseQueueID(opt.QueueID)
-	args := make([]interface{}, 2+len(jobs))
-	args[0] = opt.Namespace
-	args[1] = sqQueue
-	for i, job := range jobs {
-		sqJob, err := newSidekiqJob(job, sqQueue, sqClass)
-		if err != nil {
-			return err
-		}
-		err = sqJob.Validate()
-		if err != nil {
-			return err
-		}
-		jobm, err := json.Marshal(sqJob)
-		if err != nil {
-			return err
-		}
-		args[2+i] = jobm
-	}
-	return q.enqueueScript.Run(q.client, nil, args...).Err()
-}
-
-func (q *sidekiqQueue) bulkEnqueueIn(jobs []*work.Job, opt *work.EnqueueOptions) error {
-	if len(jobs) == 0 {
-		return nil
-	}
-	sqQueue, sqClass := parseQueueID(opt.QueueID)
-	args := make([]interface{}, 1+2*len(jobs))
-	args[0] = opt.Namespace
-	for i, job := range jobs {
-		sqJob, err := newSidekiqJob(job, sqQueue, sqClass)
-		if err != nil {
-			return err
-		}
-		err = sqJob.Validate()
-		if err != nil {
-			return err
-		}
-		jobm, err := json.Marshal(sqJob)
-		if err != nil {
-			return err
-		}
-		args[1+2*i] = job.EnqueuedAt.Unix()
-		args[1+2*i+1] = jobm
-	}
-	return q.enqueueInScript.Run(q.client, nil, args...).Err()
+	_, sqClass := parseQueueID(opt.QueueID)
+	return q.redisQueue.(work.BulkEnqueuer).BulkEnqueue(jobs, &work.EnqueueOptions{
+		Namespace: opt.Namespace,
+		QueueID:   sqClass,
+	})
 }
 
 func (q *sidekiqQueue) Dequeue(opt *work.DequeueOptions) (*work.Job, error) {
@@ -310,10 +242,6 @@ func (q *sidekiqQueue) Dequeue(opt *work.DequeueOptions) (*work.Job, error) {
 		return nil, err
 	}
 	return jobs[0], nil
-}
-
-func (q *sidekiqQueue) schedule(ns string, at time.Time) error {
-	return q.scheduleScript.Run(q.client, nil, ns, at.Unix()).Err()
 }
 
 func (q *sidekiqQueue) BulkDequeue(count int64, opt *work.DequeueOptions) ([]*work.Job, error) {
