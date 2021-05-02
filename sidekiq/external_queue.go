@@ -47,7 +47,10 @@ func (q *sidekiqQueue) externalBulkEnqueue(jobs []*work.Job, opt *work.EnqueueOp
 	if len(jobs) == 0 {
 		return nil
 	}
-	sqQueue, sqClass := parseQueueID(opt.QueueID)
+	sqQueue, sqClass, err := parseQueueID(opt.QueueID)
+	if err != nil {
+		return err
+	}
 	args := make([]interface{}, 2+len(jobs))
 	args[0] = opt.Namespace
 	args[1] = sqQueue
@@ -73,7 +76,10 @@ func (q *sidekiqQueue) externalBulkEnqueueIn(jobs []*work.Job, opt *work.Enqueue
 	if len(jobs) == 0 {
 		return nil
 	}
-	sqQueue, sqClass := parseQueueID(opt.QueueID)
+	sqQueue, sqClass, err := parseQueueID(opt.QueueID)
+	if err != nil {
+		return err
+	}
 	args := make([]interface{}, 1+2*len(jobs))
 	args[0] = opt.Namespace
 	for i, job := range jobs {

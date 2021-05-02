@@ -139,7 +139,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 		"msgpack": string(jobm),
 	}, h)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -155,7 +155,7 @@ func TestSidekiqQueueEnqueue(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -196,7 +196,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, job, jobDequeued)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -225,7 +225,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 		"msgpack": string(jobm),
 	}, h)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -284,7 +284,7 @@ func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {
 	})
 	require.Equal(t, work.ErrEmptyQueue, err)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -311,7 +311,7 @@ func TestSidekiqQueueAck(t *testing.T) {
 
 	jobKey := fmt.Sprintf("{ns1}:job:%s", job.ID)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -331,7 +331,7 @@ func TestSidekiqQueueAck(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -373,7 +373,7 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "{ns1}", m.Namespace)
-	require.Equal(t, "q1", m.QueueID)
+	require.Equal(t, "low/q1", m.QueueID)
 	require.EqualValues(t, 1, m.ReadyTotal)
 	require.EqualValues(t, 0, m.ScheduledTotal)
 
@@ -384,7 +384,7 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "{ns1}", m.Namespace)
-	require.Equal(t, "q1", m.QueueID)
+	require.Equal(t, "low/q1", m.QueueID)
 	require.EqualValues(t, 0, m.ReadyTotal)
 	require.EqualValues(t, 1, m.ScheduledTotal)
 }
@@ -419,7 +419,7 @@ func TestSidekiqQueueEnqueueDuplicated(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, job, jobDequeued)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -435,7 +435,7 @@ func TestSidekiqQueueEnqueueDuplicated(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:low/q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
