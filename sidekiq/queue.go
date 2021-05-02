@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -36,14 +37,18 @@ type sidekiqJob struct {
 	RetriedAt    float64         `json:"retried_at,omitempty"`
 }
 
+// sidekiq queue id validation errors
+var (
+	ErrInvalidQueueID = errors.New("sidekiq: queue id should have format: SIDEKIQ_QUEUE/SIDEKIQ_CLASS")
+)
+
 // sidekiq job validation errors
 var (
-	ErrJobEmptyClass      = errors.New("sidekiq: empty job class")
-	ErrJobMismatchedClass = errors.New("sidekiq: job class does not match queue id")
-	ErrJobEmptyID         = errors.New("sidekiq: empty job id")
-	ErrJobCreatedAt       = errors.New("sidekiq: job created_at should be > 0")
-	ErrJobEnqueuedAt      = errors.New("sidekiq: job enqueued_at should be > 0")
-	ErrJobArgs            = errors.New("sidekiq: job args should be an array")
+	ErrJobEmptyClass = errors.New("sidekiq: empty job class")
+	ErrJobEmptyID    = errors.New("sidekiq: empty job id")
+	ErrJobCreatedAt  = errors.New("sidekiq: job created_at should be > 0")
+	ErrJobEnqueuedAt = errors.New("sidekiq: job enqueued_at should be > 0")
+	ErrJobArgs       = errors.New("sidekiq: job args should be an array")
 )
 
 func (j *sidekiqJob) Validate() error {
@@ -76,12 +81,17 @@ func (j *sidekiqJob) Validate() error {
 func NewQueue(client redis.UniversalClient) work.Queue {
 	// https://github.com/mperham/sidekiq/blob/e3839682a3d219b8a3708feab607c74241bc06b8/lib/sidekiq/client.rb#L190
 	enqueueScript := redis.NewScript(`
-	local ns = ARGV[1]
+	local sidekiq_ns = ARGV[1]
 	local sidekiq_queue = ARGV[2]
 
+	local queues_key = "queues"
+	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
+	if sidekiq_ns ~= "" then
+		queues_key = table.concat({sidekiq_ns, queues_key}, ":")
+		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
+	end
+
 	local lpush_args = {}
-	local queues_key = table.concat({ns, "queues"}, ":")
-	local queue_key = table.concat({ns, "queue", sidekiq_queue}, ":")
 
 	for i = 3,table.getn(ARGV) do
 		local jobm = ARGV[i]
@@ -94,8 +104,11 @@ func NewQueue(client redis.UniversalClient) work.Queue {
 	`)
 
 	enqueueInScript := redis.NewScript(`
-	local ns = ARGV[1]
-	local schedule_key = table.concat({ns, "schedule"}, ":")
+	local sidekiq_ns = ARGV[1]
+	local schedule_key = "schedule"
+	if sidekiq_ns ~= "" then
+		schedule_key = table.concat({sidekiq_ns, schedule_key}, ":")
+	end
 
 	local zadd_args = {}
 
@@ -114,11 +127,15 @@ func NewQueue(client redis.UniversalClient) work.Queue {
 	// The OSS version of sidekiq could lose jobs, so it is ok if we lose some too
 	// before jobs are moved to work-compatible format.
 	dequeueScript := redis.NewScript(`
-	local ns = ARGV[1]
+	local sidekiq_ns = ARGV[1]
 	local sidekiq_queue = ARGV[2]
 
+	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
+	if sidekiq_ns ~= "" then
+		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
+	end
+
 	local ret = {}
-	local queue_key = table.concat({ns, "queue", sidekiq_queue}, ":")
 
 	while true do
 		local jobm = redis.call("rpop", queue_key)
@@ -134,17 +151,24 @@ func NewQueue(client redis.UniversalClient) work.Queue {
 	`)
 
 	scheduleScript := redis.NewScript(`
-	local ns = ARGV[1]
+	local sidekiq_ns = ARGV[1]
 	local at = tonumber(ARGV[2])
 
 	-- move scheduled jobs
-	local schedule_key = table.concat({ns, "schedule"}, ":")
-	local queues_key = table.concat({ns, "queues"}, ":")
+	local schedule_key = "schedule"
+	local queues_key = "queues"
+	if sidekiq_ns ~= "" then
+		schedule_key = table.concat({sidekiq_ns, schedule_key}, ":")
+		queues_key = table.concat({sidekiq_ns, queues_key}, ":")
+	end
+
 	local zrem_args = redis.call("zrangebyscore", schedule_key, "-inf", at)
 	for i, jobm in pairs(zrem_args) do
 		local job = cjson.decode(jobm)
-		local queue_key = table.concat({ns, "queue", job.queue}, ":")
-
+		local queue_key = table.concat({"queue", job.queue}, ":")
+		if sidekiq_ns ~= "" then
+			queue_key = table.concat({sidekiq_ns, queue_key}, ":")
+		end
 		redis.call("sadd", queues_key, job.queue)
 		redis.call("lpush", queue_key, jobm)
 	end
@@ -164,15 +188,17 @@ func NewQueue(client redis.UniversalClient) work.Queue {
 	}
 }
 
-func parseQueueID(s string) (queue, class string) {
+func parseQueueID(s string) (string, string, error) {
 	queueClass := strings.SplitN(s, "/", 2)
 	switch len(queueClass) {
 	case 2:
-		queue, class = queueClass[0], queueClass[1]
-	case 1:
-		queue, class = "default", queueClass[0]
+		return queueClass[0], queueClass[1], nil
 	}
-	return
+	return "", "", ErrInvalidQueueID
+}
+
+func formatQueueID(queue, class string) string {
+	return fmt.Sprintf("%s/%s", queue, class)
 }
 
 func newSidekiqJob(job *work.Job, sqQueue, sqClass string) (*sidekiqJob, error) {
@@ -225,15 +251,11 @@ func (q *sidekiqQueue) Enqueue(job *work.Job, opt *work.EnqueueOptions) error {
 }
 
 func (q *sidekiqQueue) BulkEnqueue(jobs []*work.Job, opt *work.EnqueueOptions) error {
-	err := opt.Validate()
+	_, _, err := parseQueueID(opt.QueueID)
 	if err != nil {
 		return err
 	}
-	_, sqClass := parseQueueID(opt.QueueID)
-	return q.redisQueue.(work.BulkEnqueuer).BulkEnqueue(jobs, &work.EnqueueOptions{
-		Namespace: opt.Namespace,
-		QueueID:   sqClass,
-	})
+	return q.redisQueue.(work.BulkEnqueuer).BulkEnqueue(jobs, opt)
 }
 
 func (q *sidekiqQueue) Dequeue(opt *work.DequeueOptions) (*work.Job, error) {
@@ -249,7 +271,10 @@ func (q *sidekiqQueue) BulkDequeue(count int64, opt *work.DequeueOptions) ([]*wo
 	if err != nil {
 		return nil, err
 	}
-	sqQueue, sqClass := parseQueueID(opt.QueueID)
+	sqQueue, _, err := parseQueueID(opt.QueueID)
+	if err != nil {
+		return nil, err
+	}
 	res, err := q.dequeueScript.Run(q.client, nil,
 		opt.Namespace,
 		sqQueue,
@@ -260,8 +285,7 @@ func (q *sidekiqQueue) BulkDequeue(count int64, opt *work.DequeueOptions) ([]*wo
 		}
 	} else {
 		jobm := res.([]interface{})
-		jobs := make([]*work.Job, len(jobm))
-		for i, iface := range jobm {
+		for _, iface := range jobm {
 			var sqJob sidekiqJob
 			err := json.NewDecoder(strings.NewReader(iface.(string))).Decode(&sqJob)
 			if err != nil {
@@ -271,29 +295,20 @@ func (q *sidekiqQueue) BulkDequeue(count int64, opt *work.DequeueOptions) ([]*wo
 			if err != nil {
 				return nil, err
 			}
-			if sqJob.Class != sqClass {
-				return nil, ErrJobMismatchedClass
-			}
 			job, err := newJob(&sqJob)
 			if err != nil {
 				return nil, err
 			}
-			jobs[i] = job
-		}
-		err = q.redisQueue.(work.BulkEnqueuer).BulkEnqueue(jobs, &work.EnqueueOptions{
-			Namespace: opt.Namespace,
-			QueueID:   sqClass,
-		})
-		if err != nil {
-			return nil, err
+			err = q.redisQueue.Enqueue(job, &work.EnqueueOptions{
+				Namespace: opt.Namespace,
+				QueueID:   formatQueueID(sqJob.Queue, sqJob.Class),
+			})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-	return q.redisQueue.(work.BulkDequeuer).BulkDequeue(count, &work.DequeueOptions{
-		Namespace:    opt.Namespace,
-		QueueID:      sqClass,
-		At:           opt.At,
-		InvisibleSec: opt.InvisibleSec,
-	})
+	return q.redisQueue.(work.BulkDequeuer).BulkDequeue(count, opt)
 }
 
 func (q *sidekiqQueue) Ack(job *work.Job, opt *work.AckOptions) error {
@@ -301,15 +316,11 @@ func (q *sidekiqQueue) Ack(job *work.Job, opt *work.AckOptions) error {
 }
 
 func (q *sidekiqQueue) BulkAck(jobs []*work.Job, opt *work.AckOptions) error {
-	err := opt.Validate()
+	_, _, err := parseQueueID(opt.QueueID)
 	if err != nil {
 		return err
 	}
-	_, sqClass := parseQueueID(opt.QueueID)
-	return q.redisQueue.(work.BulkDequeuer).BulkAck(jobs, &work.AckOptions{
-		Namespace: opt.Namespace,
-		QueueID:   sqClass,
-	})
+	return q.redisQueue.(work.BulkDequeuer).BulkAck(jobs, opt)
 }
 
 var (
@@ -319,14 +330,9 @@ var (
 )
 
 func (q *sidekiqQueue) GetQueueMetrics(opt *work.QueueMetricsOptions) (*work.QueueMetrics, error) {
-	err := opt.Validate()
+	_, _, err := parseQueueID(opt.QueueID)
 	if err != nil {
 		return nil, err
 	}
-	_, sqClass := parseQueueID(opt.QueueID)
-	return q.redisQueue.(work.MetricsExporter).GetQueueMetrics(&work.QueueMetricsOptions{
-		Namespace: opt.Namespace,
-		QueueID:   sqClass,
-		At:        opt.At,
-	})
+	return q.redisQueue.(work.MetricsExporter).GetQueueMetrics(opt)
 }
