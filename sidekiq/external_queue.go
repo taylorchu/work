@@ -7,20 +7,11 @@ import (
 	"github.com/taylorchu/work"
 )
 
-func (q *sidekiqQueue) schedule(ns string, at time.Time) error {
-	return q.scheduleScript.Run(q.client, nil, ns, at.Unix()).Err()
-}
-
 func (q *sidekiqQueue) ExternalEnqueue(job *work.Job, opt *work.EnqueueOptions) error {
 	return q.ExternalBulkEnqueue([]*work.Job{job}, opt)
 }
 
 func (q *sidekiqQueue) ExternalBulkEnqueue(jobs []*work.Job, opt *work.EnqueueOptions) error {
-	err := opt.Validate()
-	if err != nil {
-		return err
-	}
-
 	now := time.Now()
 	readyJobs := make([]*work.Job, 0, len(jobs))
 	scheduledJobs := make([]*work.Job, 0, len(jobs))
@@ -32,7 +23,7 @@ func (q *sidekiqQueue) ExternalBulkEnqueue(jobs []*work.Job, opt *work.EnqueueOp
 		}
 	}
 
-	err = q.externalBulkEnqueue(readyJobs, opt)
+	err := q.externalBulkEnqueue(readyJobs, opt)
 	if err != nil {
 		return err
 	}
@@ -47,7 +38,7 @@ func (q *sidekiqQueue) externalBulkEnqueue(jobs []*work.Job, opt *work.EnqueueOp
 	if len(jobs) == 0 {
 		return nil
 	}
-	sqQueue, sqClass, err := parseQueueID(opt.QueueID)
+	sqQueue, sqClass, err := ParseQueueID(opt.QueueID)
 	if err != nil {
 		return err
 	}
@@ -76,7 +67,7 @@ func (q *sidekiqQueue) externalBulkEnqueueIn(jobs []*work.Job, opt *work.Enqueue
 	if len(jobs) == 0 {
 		return nil
 	}
-	sqQueue, sqClass, err := parseQueueID(opt.QueueID)
+	sqQueue, sqClass, err := ParseQueueID(opt.QueueID)
 	if err != nil {
 		return err
 	}
