@@ -339,7 +339,7 @@ func TestRetry(t *testing.T) {
 		QueueID:      "q1",
 		InvisibleSec: 10,
 	}
-	retrier := retry(NewRedisQueue(client))
+	retrier := retry(NewRedisQueue(client), defaultBackoff())
 	h := retrier(func(*Job, *DequeueOptions) error {
 		return ErrUnrecoverable
 	})
