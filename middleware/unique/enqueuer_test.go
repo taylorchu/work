@@ -1,6 +1,7 @@
 package unique
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -65,7 +66,7 @@ func TestEnqueuer(t *testing.T) {
 	require.Equal(t, 1, called)
 
 	for i := 0; i < 3; i++ {
-		require.NoError(t, client.Del("{ns1}:unique:q1:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08").Err())
+		require.NoError(t, client.Del(context.Background(), "{ns1}:unique:q1:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08").Err())
 		job := work.NewJob()
 		err := h(job, &work.EnqueueOptions{
 			Namespace: "{ns1}",

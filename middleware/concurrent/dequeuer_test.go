@@ -1,11 +1,12 @@
 package concurrent
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
 	"github.com/taylorchu/work/redistest"
@@ -59,7 +60,9 @@ func TestDequeuer(t *testing.T) {
 	}
 	require.Equal(t, 5, called)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:lock:q1",
+	z, err := client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:lock:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -71,7 +74,7 @@ func TestDequeuer(t *testing.T) {
 	require.EqualValues(t, opt.At.Unix()+60, z[0].Score)
 	require.EqualValues(t, opt.At.Unix()+60, z[1].Score)
 
-	require.NoError(t, client.ZRem("{ns1}:lock:q1", "w1").Err())
+	require.NoError(t, client.ZRem(context.Background(), "{ns1}:lock:q1", "w1").Err())
 	optLater := *opt
 	optLater.At = opt.At.Add(10 * time.Second)
 	// worker 0 is locked already
@@ -87,7 +90,9 @@ func TestDequeuer(t *testing.T) {
 	}
 	require.Equal(t, 5, called)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:lock:q1",
+	z, err = client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:lock:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -117,7 +122,9 @@ func TestDequeuer(t *testing.T) {
 	}
 	require.Equal(t, 7, called)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:lock:q1",
+	z, err = client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:lock:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",

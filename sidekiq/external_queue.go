@@ -1,6 +1,7 @@
 package sidekiq
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -60,7 +61,7 @@ func (q *sidekiqQueue) externalBulkEnqueue(jobs []*work.Job, opt *work.EnqueueOp
 		}
 		args[2+i] = jobm
 	}
-	return q.enqueueScript.Run(q.client, nil, args...).Err()
+	return q.enqueueScript.Run(context.Background(), q.client, nil, args...).Err()
 }
 
 func (q *sidekiqQueue) externalBulkEnqueueIn(jobs []*work.Job, opt *work.EnqueueOptions) error {
@@ -89,7 +90,7 @@ func (q *sidekiqQueue) externalBulkEnqueueIn(jobs []*work.Job, opt *work.Enqueue
 		args[1+2*i] = job.EnqueuedAt.Unix()
 		args[1+2*i+1] = jobm
 	}
-	return q.enqueueInScript.Run(q.client, nil, args...).Err()
+	return q.enqueueInScript.Run(context.Background(), q.client, nil, args...).Err()
 }
 
 var (

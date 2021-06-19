@@ -83,7 +83,7 @@ func (j *Job) MarshalJSONPayload(v interface{}) error {
 
 // NewJob creates a job.
 func NewJob() *Job {
-	id := uuid.Must(uuid.NewUUID()).String()
+	id := uuid.NewString()
 	now := time.Now().Truncate(time.Second)
 	return &Job{
 		ID:         id,

@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 func marshal(v interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := msgpack.NewEncoder(&buf)
-	enc.UseCompactEncoding(true)
-	enc.SortMapKeys(true)
+	enc.UseCompactInts(true)
+	enc.UseCompactFloats(true)
+	enc.SetSortMapKeys(true)
 	err := enc.Encode(v)
 	if err != nil {
 		return nil, err
@@ -26,6 +27,6 @@ type bufReader interface {
 
 func unmarshal(r bufReader, v interface{}) error {
 	dec := msgpack.NewDecoder(r)
-	dec.UseDecodeInterfaceLoose(true)
+	dec.UseLooseInterfaceDecoding(true)
 	return dec.Decode(v)
 }
