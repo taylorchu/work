@@ -3,7 +3,7 @@ package concurrent
 import (
 	"fmt"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/taylorchu/work"
 	"github.com/taylorchu/work/redislock"
@@ -23,7 +23,7 @@ func Dequeuer(copt *DequeuerOptions) work.DequeueMiddleware {
 	return func(f work.DequeueFunc) work.DequeueFunc {
 		workerID := copt.workerID
 		if workerID == "" {
-			workerID = uuid.New().String()
+			workerID = uuid.NewString()
 		}
 		return func(opt *work.DequeueOptions) (*work.Job, error) {
 			lock := &redislock.Lock{

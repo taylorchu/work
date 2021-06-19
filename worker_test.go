@@ -1,13 +1,14 @@
 package work
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work/redistest"
 )
@@ -76,7 +77,9 @@ func waitEmpty(client redis.UniversalClient, key string, timeout time.Duration) 
 		case <-timeoutTimer.C:
 			return errors.New("timeout")
 		case <-ticker.C:
-			z, err := client.ZRangeByScoreWithScores(key,
+			z, err := client.ZRangeByScoreWithScores(
+				context.Background(),
+				key,
 				&redis.ZRangeBy{
 					Min: "-inf",
 					Max: fmt.Sprint(time.Now().Unix()),
@@ -162,11 +165,11 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	count, err := client.ZCard("{ns1}:queue:test1").Result()
+	count, err := client.ZCard(context.Background(), "{ns1}:queue:test1").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
-	count, err = client.ZCard("{ns1}:queue:test2").Result()
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:test2").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
@@ -177,11 +180,11 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err = client.ZCard("{ns1}:queue:test1").Result()
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:test1").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, count)
 
-	count, err = client.ZCard("{ns1}:queue:test2").Result()
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:test2").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, count)
 }
@@ -240,7 +243,7 @@ func TestWorkerRunJob(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	count, err := client.ZCard("{ns1}:queue:success").Result()
+	count, err := client.ZCard(context.Background(), "{ns1}:queue:success").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
@@ -249,7 +252,7 @@ func TestWorkerRunJob(t *testing.T) {
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err = client.ZCard("{ns1}:queue:success").Result()
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:success").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, count)
 
@@ -265,7 +268,7 @@ func TestWorkerRunJob(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	count, err = client.ZCard("{ns1}:queue:failure").Result()
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:failure").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
@@ -274,7 +277,7 @@ func TestWorkerRunJob(t *testing.T) {
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err = client.ZCard("{ns1}:queue:failure").Result()
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:failure").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
@@ -302,7 +305,7 @@ func TestWorkerRunJob(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	count, err = client.ZCard("{ns1}:queue:panic").Result()
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:panic").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
@@ -311,7 +314,7 @@ func TestWorkerRunJob(t *testing.T) {
 	require.NoError(t, err)
 	w.Stop()
 
-	count, err = client.ZCard("{ns1}:queue:panic").Result()
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:panic").Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 3, count)
 
@@ -349,7 +352,9 @@ func TestRetry(t *testing.T) {
 	require.EqualValues(t, 0, job.Retries)
 	require.Equal(t, "", job.LastError)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -379,7 +384,9 @@ func TestRetry(t *testing.T) {
 		require.EqualValues(t, i, job.Retries)
 		require.Equal(t, retryErr.Error(), job.LastError)
 
-		z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+		z, err := client.ZRangeByScoreWithScores(
+			context.Background(),
+			"{ns1}:queue:q1",
 			&redis.ZRangeBy{
 				Min: "-inf",
 				Max: "+inf",

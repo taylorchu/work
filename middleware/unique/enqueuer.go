@@ -1,12 +1,13 @@
 package unique
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/taylorchu/work"
 )
 
@@ -48,7 +49,7 @@ func Enqueuer(eopt *EnqueuerOptions) work.EnqueueMiddleware {
 				return err
 			}
 			key := fmt.Sprintf("%s:unique:%s:%x", opt.Namespace, opt.QueueID, h.Sum(nil))
-			notExist, err := eopt.Client.SetNX(key, 1, expireIn).Result()
+			notExist, err := eopt.Client.SetNX(context.Background(), key, 1, expireIn).Result()
 			if err != nil {
 				return err
 			}

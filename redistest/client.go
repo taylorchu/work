@@ -1,10 +1,11 @@
 package redistest
 
 import (
+	"context"
 	"os"
 	"strings"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 )
 
 // NewClient creates a redis client for testing.
@@ -25,9 +26,9 @@ func NewClient() redis.UniversalClient {
 // Reset is used to clear redis for next test.
 func Reset(client redis.UniversalClient) error {
 	if cc, ok := client.(*redis.ClusterClient); ok {
-		return cc.ForEachMaster(func(c *redis.Client) error {
-			return c.FlushAll().Err()
+		return cc.ForEachMaster(context.Background(), func(ctx context.Context, c *redis.Client) error {
+			return c.FlushAll(ctx).Err()
 		})
 	}
-	return client.FlushAll().Err()
+	return client.FlushAll(context.Background()).Err()
 }

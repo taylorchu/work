@@ -1,11 +1,12 @@
 package work
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work/redistest"
 )
@@ -32,7 +33,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 
 	jobKey := fmt.Sprintf("{ns1}:job:%s", job.ID)
 
-	h, err := client.HGetAll(jobKey).Result()
+	h, err := client.HGetAll(context.Background(), jobKey).Result()
 	require.NoError(t, err)
 	jobm, err := marshal(job)
 	require.NoError(t, err)
@@ -63,7 +64,9 @@ func TestRedisQueueEnqueue(t *testing.T) {
 	require.Equal(t, job.ID, jobs[0].ID)
 	require.Equal(t, "hello world", jobs[0].LastError)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -79,7 +82,9 @@ func TestRedisQueueEnqueue(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err = client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -122,7 +127,9 @@ func TestRedisQueueDequeue(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, job, jobDequeued)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -141,7 +148,7 @@ func TestRedisQueueDequeue(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, job, jobDequeued)
 
-	h, err := client.HGetAll(jobKey).Result()
+	h, err := client.HGetAll(context.Background(), jobKey).Result()
 	require.NoError(t, err)
 	jobm, err := marshal(job)
 	require.NoError(t, err)
@@ -149,7 +156,9 @@ func TestRedisQueueDequeue(t *testing.T) {
 		"msgpack": string(jobm),
 	}, h)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err = client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -192,7 +201,7 @@ func TestRedisQueueDequeueDeletedJob(t *testing.T) {
 
 	jobKey := fmt.Sprintf("{ns1}:job:%s", job.ID)
 
-	h, err := client.HGetAll(jobKey).Result()
+	h, err := client.HGetAll(context.Background(), jobKey).Result()
 	require.NoError(t, err)
 	jobm, err := marshal(job)
 	require.NoError(t, err)
@@ -200,7 +209,7 @@ func TestRedisQueueDequeueDeletedJob(t *testing.T) {
 		"msgpack": string(jobm),
 	}, h)
 
-	require.NoError(t, client.Del(jobKey).Err())
+	require.NoError(t, client.Del(context.Background(), jobKey).Err())
 
 	_, err = q.Dequeue(&DequeueOptions{
 		Namespace:    "{ns1}",
@@ -210,7 +219,9 @@ func TestRedisQueueDequeueDeletedJob(t *testing.T) {
 	})
 	require.Equal(t, ErrEmptyQueue, err)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -235,7 +246,9 @@ func TestRedisQueueAck(t *testing.T) {
 
 	jobKey := fmt.Sprintf("{ns1}:job:%s", job.ID)
 
-	z, err := client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err := client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -245,7 +258,7 @@ func TestRedisQueueAck(t *testing.T) {
 	require.Equal(t, jobKey, z[0].Member)
 	require.EqualValues(t, job.EnqueuedAt.Unix(), z[0].Score)
 
-	e, err := client.Exists(jobKey).Result()
+	e, err := client.Exists(context.Background(), jobKey).Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 1, e)
 
@@ -255,7 +268,9 @@ func TestRedisQueueAck(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	z, err = client.ZRangeByScoreWithScores("{ns1}:queue:q1",
+	z, err = client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -263,7 +278,7 @@ func TestRedisQueueAck(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, z, 0)
 
-	e, err = client.Exists(jobKey).Result()
+	e, err = client.Exists(context.Background(), jobKey).Result()
 	require.NoError(t, err)
 	require.EqualValues(t, 0, e)
 

@@ -1,13 +1,14 @@
 package sidekiq
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/taylorchu/work"
 )
 
@@ -175,7 +176,7 @@ func FormatQueueID(queue, class string) string {
 }
 
 func (q *sidekiqQueue) schedule(ns string, at time.Time) error {
-	return q.scheduleScript.Run(q.client, nil, ns, at.Unix()).Err()
+	return q.scheduleScript.Run(context.Background(), q.client, nil, ns, at.Unix()).Err()
 }
 
 // JobPuller pulls jobs from sidekiq-compatible queue.
@@ -208,7 +209,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	if err != nil {
 		return err
 	}
-	res, err := q.dequeueScript.Run(q.client, nil,
+	res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
 		opt.SidekiqNamespace,
 		opt.SidekiqQueue,
 	).Result()

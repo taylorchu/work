@@ -2,10 +2,10 @@ version: 2
 jobs:
   redis5:
     docker:
-      - image: circleci/golang:1.15
+      - image: circleci/golang:1.16
         environment:
           - GO111MODULE=on
-      - image: redis:5.0-alpine
+      - image: redis:5-alpine
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
@@ -13,11 +13,11 @@ jobs:
       - run: go test -p 1 -v ./...
   redis5-cluster:
     docker:
-      - image: circleci/golang:1.15
+      - image: circleci/golang:1.16
         environment:
           - GO111MODULE=on
           - REDIS_ADDR=:7000,:7001,:7002
-      - image: redis:5.0-alpine
+      - image: redis:5-alpine
         command:
           - --cluster-enabled
           - "yes"
@@ -25,7 +25,7 @@ jobs:
           - "7000"
           - --cluster-config-file
           - 7000.conf
-      - image: redis:5.0-alpine
+      - image: redis:5-alpine
         command:
           - --cluster-enabled
           - "yes"
@@ -33,7 +33,7 @@ jobs:
           - "7001"
           - --cluster-config-file
           - 7001.conf
-      - image: redis:5.0-alpine
+      - image: redis:5-alpine
         command:
           - --cluster-enabled
           - "yes"
@@ -50,10 +50,10 @@ jobs:
       - run: go test -p 1 -v ./...
   redis6:
     docker:
-      - image: circleci/golang:1.15
+      - image: circleci/golang:1.16
         environment:
           - GO111MODULE=on
-      - image: redis:6.0-alpine
+      - image: redis:6-alpine
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
@@ -61,11 +61,11 @@ jobs:
       - run: go test -p 1 -v ./...
   redis6-cluster:
     docker:
-      - image: circleci/golang:1.15
+      - image: circleci/golang:1.16
         environment:
           - GO111MODULE=on
           - REDIS_ADDR=:7000,:7001,:7002
-      - image: redis:6.0-alpine
+      - image: redis:6-alpine
         command:
           - --cluster-enabled
           - "yes"
@@ -73,7 +73,7 @@ jobs:
           - "7000"
           - --cluster-config-file
           - 7000.conf
-      - image: redis:6.0-alpine
+      - image: redis:6-alpine
         command:
           - --cluster-enabled
           - "yes"
@@ -81,7 +81,7 @@ jobs:
           - "7001"
           - --cluster-config-file
           - 7001.conf
-      - image: redis:6.0-alpine
+      - image: redis:6-alpine
         command:
           - --cluster-enabled
           - "yes"
@@ -98,7 +98,7 @@ jobs:
       - run: go test -p 1 -v ./...
   keydb:
     docker:
-      - image: circleci/golang:1.15
+      - image: circleci/golang:1.16
         environment:
           - GO111MODULE=on
       - image: eqalpha/keydb

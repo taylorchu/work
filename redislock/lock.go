@@ -1,9 +1,10 @@
 package redislock
 
 import (
+	"context"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 )
 
 // Lock supports expiring lock with multiple acquirers.
@@ -41,7 +42,7 @@ func (l *Lock) Acquire() (bool, error) {
 	return 0
 	`)
 
-	acquired, err := lockScript.Run(l.Client, nil,
+	acquired, err := lockScript.Run(context.Background(), l.Client, nil,
 		l.Key,
 		l.ID,
 		l.At.Unix(),
@@ -62,7 +63,7 @@ func (l *Lock) Release() error {
 
 	return redis.call("zrem", lock_key, lock_id)
 	`)
-	err := unlockScript.Run(l.Client, nil,
+	err := unlockScript.Run(context.Background(), l.Client, nil,
 		l.Key,
 		l.ID,
 	).Err()

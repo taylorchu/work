@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/gocraft/work"
 	redigo "github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/require"
 	work2 "github.com/taylorchu/work"
+	"github.com/taylorchu/work/redistest"
 )
 
 func BenchmarkWorkerRunJob(b *testing.B) {
@@ -28,7 +29,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 	}
 	defer pool.Close()
 
-	for k := 1; k <= 100000; k *= 10 {
+	for k := 1; k <= 1000; k *= 10 {
 		b.Run(fmt.Sprintf("work_v1_%d", k), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				b.StopTimer()
