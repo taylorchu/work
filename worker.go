@@ -137,6 +137,93 @@ func (w *Worker) RegisterWithContext(queueID string, h ContextHandleFunc, opt *J
 	return nil
 }
 
+// OnceJobOptions specifies how a job is executed.
+type OnceJobOptions struct {
+	MaxExecutionTime time.Duration
+	Backoff          BackoffFunc
+
+	DequeueMiddleware []DequeueMiddleware
+	HandleMiddleware  []HandleMiddleware
+}
+
+// AddDequeueMiddleware adds DequeueMiddleware.
+func (opt *OnceJobOptions) AddDequeueMiddleware(mw DequeueMiddleware) *OnceJobOptions {
+	opt.DequeueMiddleware = append(opt.DequeueMiddleware, mw)
+	return opt
+}
+
+// AddHandleMiddleware adds HandleMiddleware.
+func (opt *OnceJobOptions) AddHandleMiddleware(mw HandleMiddleware) *OnceJobOptions {
+	opt.HandleMiddleware = append(opt.HandleMiddleware, mw)
+	return opt
+}
+
+// Validate validates OnceJobOptions.
+func (opt *OnceJobOptions) Validate() error {
+	if opt.MaxExecutionTime <= 0 {
+		return ErrMaxExecutionTime
+	}
+	return nil
+}
+
+// RunOnce simply runs one job from a queue.
+// The context is created with context.WithTimeout set from MaxExecutionTime.
+//
+// This is used with kubernetes where a pod is created directly to run a job.
+func (w *Worker) RunOnce(ctx context.Context, queueID string, h ContextHandleFunc, opt *OnceJobOptions) error {
+	err := opt.Validate()
+	if err != nil {
+		return err
+	}
+
+	queue := w.opt.Queue
+	ns := w.opt.Namespace
+
+	dequeue := queue.Dequeue
+	for _, mw := range opt.DequeueMiddleware {
+		dequeue = mw(dequeue)
+	}
+
+	handle := func(job *Job, o *DequeueOptions) error {
+		ctx, cancel := context.WithTimeout(ctx, opt.MaxExecutionTime)
+		defer cancel()
+		return h(ctx, job, o)
+	}
+	for _, mw := range opt.HandleMiddleware {
+		handle = mw(handle)
+	}
+	handle = catchPanic(handle)
+
+	b := opt.Backoff
+	if b == nil {
+		b = defaultBackoff()
+	}
+	handle = retry(queue, b)(handle)
+
+	dopt := &DequeueOptions{
+		Namespace:    ns,
+		QueueID:      queueID,
+		At:           time.Now(),
+		InvisibleSec: int64(opt.MaxExecutionTime / time.Second),
+	}
+	job, err := dequeue(dopt)
+	if err != nil {
+		return err
+	}
+	err = handle(job, dopt)
+	if err != nil {
+		return err
+	}
+	err = queue.Ack(job, &AckOptions{
+		Namespace: dopt.Namespace,
+		QueueID:   dopt.QueueID,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Start starts the worker.
 func (w *Worker) Start() {
 	ctx, cancel := context.WithCancel(context.Background())

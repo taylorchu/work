@@ -331,6 +331,94 @@ func TestWorkerRunJob(t *testing.T) {
 	}
 }
 
+func TestWorkerRunOnce(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+
+	job := NewJob()
+	err := NewRedisQueue(client).Enqueue(job, &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "success",
+	})
+	require.NoError(t, err)
+
+	count, err := client.ZCard(context.Background(), "{ns1}:queue:success").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+
+	job2 := NewJob()
+	err = NewRedisQueue(client).Enqueue(job2, &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "failure",
+	})
+	require.NoError(t, err)
+
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:failure").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+
+	job3 := NewJob()
+	err = NewRedisQueue(client).Enqueue(job3, &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "panic",
+	})
+	require.NoError(t, err)
+
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:panic").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+
+	w := NewWorker(&WorkerOptions{
+		Namespace: "{ns1}",
+		Queue:     NewRedisQueue(client),
+	})
+
+	err = w.RunOnce(
+		context.Background(),
+		"success",
+		func(context.Context, *Job, *DequeueOptions) error { return nil },
+		&OnceJobOptions{
+			MaxExecutionTime: time.Minute,
+		},
+	)
+	require.NoError(t, err)
+
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:success").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 0, count)
+
+	err = w.RunOnce(
+		context.Background(),
+		"failure",
+		func(context.Context, *Job, *DequeueOptions) error { return errors.New("no reason") },
+		&OnceJobOptions{
+			MaxExecutionTime: time.Minute,
+		},
+	)
+	require.Error(t, err)
+	require.Equal(t, "no reason", err.Error())
+
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:failure").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+
+	err = w.RunOnce(
+		context.Background(),
+		"panic",
+		func(context.Context, *Job, *DequeueOptions) error { panic("unexpected") },
+		&OnceJobOptions{
+			MaxExecutionTime: time.Minute,
+		},
+	)
+	require.Error(t, err)
+	require.True(t, strings.HasPrefix(err.Error(), "panic: unexpected"))
+
+	count, err = client.ZCard(context.Background(), "{ns1}:queue:panic").Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+}
+
 func TestRetry(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
