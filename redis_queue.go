@@ -17,6 +17,7 @@ type redisQueue struct {
 	findScript    *redis.Script
 }
 
+// RedisQueue implements Queue with other additional capabilities
 type RedisQueue interface {
 	Queue
 	BulkEnqueuer
