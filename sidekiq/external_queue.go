@@ -92,8 +92,3 @@ func (q *sidekiqQueue) externalBulkEnqueueIn(jobs []*work.Job, opt *work.Enqueue
 	}
 	return q.enqueueInScript.Run(context.Background(), q.client, nil, args...).Err()
 }
-
-var (
-	_ work.ExternalEnqueuer     = (*sidekiqQueue)(nil)
-	_ work.ExternalBulkEnqueuer = (*sidekiqQueue)(nil)
-)
