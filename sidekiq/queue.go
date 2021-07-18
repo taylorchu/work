@@ -26,7 +26,7 @@ var (
 	ErrInvalidQueueID = errors.New("sidekiq: queue id should have format: SIDEKIQ_QUEUE/SIDEKIQ_CLASS")
 )
 
-// Queue extends redisQueue, and allows job pulling from sidekiq-compatible queue.
+// Queue extends RedisQueue, and allows job pulling from sidekiq-compatible queue.
 type Queue interface {
 	work.RedisQueue
 	JobPuller
