@@ -41,7 +41,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 		"msgpack": string(jobm),
 	}, h)
 
-	jobs, err := q.(BulkJobFinder).BulkFind([]string{job.ID, "not-exist-id"}, &FindOptions{
+	jobs, err := q.BulkFind([]string{job.ID, "not-exist-id"}, &FindOptions{
 		Namespace: "{ns1}",
 	})
 	require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestRedisQueueEnqueue(t *testing.T) {
 		QueueID:   "q1",
 	})
 	require.NoError(t, err)
-	jobs, err = q.(BulkJobFinder).BulkFind([]string{job.ID}, &FindOptions{
+	jobs, err = q.BulkFind([]string{job.ID}, &FindOptions{
 		Namespace: "{ns1}",
 	})
 	require.NoError(t, err)
@@ -303,7 +303,7 @@ func TestRedisQueueGetQueueMetrics(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	m, err := q.(MetricsExporter).GetQueueMetrics(&QueueMetricsOptions{
+	m, err := q.GetQueueMetrics(&QueueMetricsOptions{
 		Namespace: "{ns1}",
 		QueueID:   "q1",
 		At:        job.EnqueuedAt,
@@ -314,7 +314,7 @@ func TestRedisQueueGetQueueMetrics(t *testing.T) {
 	require.EqualValues(t, 1, m.ReadyTotal)
 	require.EqualValues(t, 0, m.ScheduledTotal)
 
-	m, err = q.(MetricsExporter).GetQueueMetrics(&QueueMetricsOptions{
+	m, err = q.GetQueueMetrics(&QueueMetricsOptions{
 		Namespace: "{ns1}",
 		QueueID:   "q1",
 		At:        job.EnqueuedAt.Add(-time.Second),

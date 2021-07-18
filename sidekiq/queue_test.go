@@ -199,7 +199,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 
 	now := job.EnqueuedAt.Add(123 * time.Second)
 
-	err = q.(*sidekiqQueue).schedule("{ns1}", now)
+	err = q.schedule("{ns1}", now)
 	require.NoError(t, err)
 	err = q.Pull(&PullOptions{
 		Namespace:        "{ns1}",
@@ -228,7 +228,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	require.Equal(t, jobKey, z[0].Member)
 	require.EqualValues(t, job.EnqueuedAt.Unix(), z[0].Score)
 
-	err = q.(*sidekiqQueue).schedule("{ns1}", now)
+	err = q.schedule("{ns1}", now)
 	require.NoError(t, err)
 	jobDequeued, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "{ns1}",
@@ -260,7 +260,7 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	require.EqualValues(t, now.Unix()+60, z[0].Score)
 
 	// empty
-	err = q.(*sidekiqQueue).schedule("{ns1}", now)
+	err = q.schedule("{ns1}", now)
 	require.NoError(t, err)
 	_, err = q.Dequeue(&work.DequeueOptions{
 		Namespace:    "{ns1}",
@@ -438,7 +438,7 @@ func TestSidekiqQueueEnqueueDuplicated(t *testing.T) {
 
 	now := job.EnqueuedAt
 
-	err = q.(*sidekiqQueue).schedule("{ns1}", now)
+	err = q.schedule("{ns1}", now)
 	require.NoError(t, err)
 	err = q.Pull(&PullOptions{
 		Namespace:        "{ns1}",
