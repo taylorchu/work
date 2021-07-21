@@ -13,7 +13,7 @@ import (
 )
 
 type sidekiqQueue struct {
-	redisQueue
+	work.RedisQueue
 	client          redis.UniversalClient
 	enqueueScript   *redis.Script
 	enqueueInScript *redis.Script
@@ -26,20 +26,13 @@ var (
 	ErrInvalidQueueID = errors.New("sidekiq: queue id should have format: SIDEKIQ_QUEUE/SIDEKIQ_CLASS")
 )
 
-type redisQueue interface {
-	work.Queue
-	work.BulkEnqueuer
-	work.BulkDequeuer
-	work.BulkJobFinder
-	work.MetricsExporter
-}
-
-// Queue extends redisQueue, and allows job pulling from sidekiq-compatible queue.
+// Queue extends RedisQueue, and allows job pulling from sidekiq-compatible queue.
 type Queue interface {
-	redisQueue
+	work.RedisQueue
 	JobPuller
 	work.ExternalEnqueuer
 	work.ExternalBulkEnqueuer
+	schedule(string, time.Time) error
 }
 
 // NewQueue creates a new queue stored in redis with sidekiq-compatible format.
@@ -151,7 +144,7 @@ func NewQueue(client redis.UniversalClient) Queue {
 	`)
 
 	return &sidekiqQueue{
-		redisQueue:      work.NewRedisQueue(client).(redisQueue),
+		RedisQueue:      work.NewRedisQueue(client),
 		client:          client,
 		enqueueScript:   enqueueScript,
 		enqueueInScript: enqueueInScript,
@@ -233,7 +226,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 			if err != nil {
 				return err
 			}
-			err = q.redisQueue.Enqueue(job, &work.EnqueueOptions{
+			err = q.RedisQueue.Enqueue(job, &work.EnqueueOptions{
 				Namespace: opt.Namespace,
 				QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
 			})

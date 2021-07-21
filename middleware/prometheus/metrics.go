@@ -99,7 +99,7 @@ func EnqueueFuncMetrics(f work.EnqueueFunc) work.EnqueueFunc {
 	}
 }
 
-// ExportWorkerMetrics adds prometheus metrics from work.Worker.
+// ExportWorkerMetrics adds prometheus metrics from Worker.
 func ExportWorkerMetrics(w *work.Worker) error {
 	all, err := w.ExportMetrics()
 	if err != nil {
