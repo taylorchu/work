@@ -107,6 +107,18 @@ jobs:
       - checkout
       - run: dockerize -wait tcp://:6379
       - run: go test -p 1 -v ./...
+  fossa:
+    docker:
+      - image: circleci/golang:1.16
+        environment:
+          - GO111MODULE=on
+    working_directory: /go/src/github.com/taylorchu/work
+    steps:
+      - checkout
+      - run: |
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash
+      - run: fossa analyze
+      - run: fossa test
 workflows:
   version: 2
   build_and_test:
@@ -116,3 +128,4 @@ workflows:
       - redis5-cluster
       - redis6-cluster
       - keydb
+      - fossa
