@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/taylorchu/work?status.png)](https://godoc.org/github.com/taylorchu/work)
 [![Go Report Card](https://goreportcard.com/badge/github.com/taylorchu/work)](https://goreportcard.com/report/github.com/taylorchu/work)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ftaylorchu%2Fwork.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Ftaylorchu%2Fwork?ref=badge_shield)
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B4257%2Fgit%40github.com%3Ataylorchu%2Fwork.git.svg?type=shield)](https://app.fossa.com/projects/custom%2B4257%2Fgit%40github.com%3Ataylorchu%2Fwork.git?ref=badge_shield)
 [![CircleCI](https://circleci.com/gh/taylorchu/work.svg?style=svg)](https://circleci.com/gh/taylorchu/work)
 
 Please see `cmd/` for enqueuer and worker demo.
@@ -41,4 +41,4 @@ Please see `cmd/` for enqueuer and worker demo.
 
 
 ## License
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ftaylorchu%2Fwork.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Ftaylorchu%2Fwork?ref=badge_large)
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B4257%2Fgit%40github.com%3Ataylorchu%2Fwork.git.svg?type=large)](https://app.fossa.com/projects/custom%2B4257%2Fgit%40github.com%3Ataylorchu%2Fwork.git?ref=badge_large)
