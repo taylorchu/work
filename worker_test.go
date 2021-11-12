@@ -191,12 +191,14 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 
 func TestLostJob(t *testing.T) {
 	/*
-		1. Job with id "X" is enqueued.
-		2. Job with id "X" is dequeued by worker #1.
-		3. Job with id "X" is enqueued
-		4. Worker #1 returns without error
-		5. Worker #1 flushes ACK
-		6. Job enqueued at step 3 is lost.
+		Within the same queue:
+
+			1. Job with id "X" is enqueued
+			2. Job with id "X" is dequeued by worker №1
+			3. Job with id "X" is enqueued
+			4. Handler of worker №1 returns without error
+			5. Worker №1 flushes ACK
+			6. Job enqueued at step 3 is lost
 	*/
 	client := redistest.NewClient()
 	defer client.Close()
