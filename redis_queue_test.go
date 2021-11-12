@@ -325,3 +325,47 @@ func TestRedisQueueGetQueueMetrics(t *testing.T) {
 	require.EqualValues(t, 0, m.ReadyTotal)
 	require.EqualValues(t, 1, m.ScheduledTotal)
 }
+
+func TestRedisWithTimestampResolution(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewRedisQueue(client, WithTimestampResolution(time.Millisecond))
+
+	type message struct {
+		Text string
+	}
+
+	job := NewJob()
+	err := job.MarshalPayload(message{Text: "hello"})
+	require.NoError(t, err)
+
+	job.EnqueuedAt = time.Now().
+		Add(300 * time.Millisecond).
+		Truncate(time.Millisecond)
+	err = q.Enqueue(job, &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "q1",
+	})
+	require.NoError(t, err)
+
+	jobDequeued, err := q.Dequeue(&DequeueOptions{
+		Namespace:    "{ns1}",
+		QueueID:      "q1",
+		At:           time.Now(),
+		InvisibleSec: 0,
+	})
+
+	require.ErrorIs(t, err, ErrEmptyQueue)
+	require.Nil(t, jobDequeued)
+
+	jobDequeued, err = q.Dequeue(&DequeueOptions{
+		Namespace:    "{ns1}",
+		QueueID:      "q1",
+		At:           job.EnqueuedAt.Add(time.Millisecond),
+		InvisibleSec: 0,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, job, jobDequeued)
+}
