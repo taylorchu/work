@@ -6,24 +6,24 @@ import (
 	"time"
 )
 
-type Duration time.Duration
+type duration time.Duration
 
-func (d Duration) MarshalJSON() ([]byte, error) {
+func (d duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Duration(d).String())
 }
 
-func (d *Duration) UnmarshalJSON(b []byte) error {
+func (d *duration) UnmarshalJSON(b []byte) error {
 	var v interface{}
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
-	switch value := v.(type) {
+	switch v := v.(type) {
 	case string:
-		tmp, err := time.ParseDuration(value)
+		tmp, err := time.ParseDuration(v)
 		if err != nil {
 			return err
 		}
-		*d = Duration(tmp)
+		*d = duration(tmp)
 		return nil
 	default:
 		return fmt.Errorf("invalid duration: %v", v)

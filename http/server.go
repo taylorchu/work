@@ -120,7 +120,7 @@ func NewServer(opts *ServerOptions) http.Handler {
 				var enqueueRequest struct {
 					ID      string          `json:"id"`
 					Payload json.RawMessage `json:"payload"`
-					Delay   Duration        `json:"delay"`
+					Delay   duration        `json:"delay"`
 				}
 				err := json.NewDecoder(r.Body).Decode(&enqueueRequest)
 				if err != nil {
