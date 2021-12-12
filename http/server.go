@@ -25,6 +25,7 @@ func NewServer(opts *ServerOptions) http.Handler {
 			namespace := r.URL.Query().Get("namespace")
 			queueID := r.URL.Query().Get("queue_id")
 			jobID := r.URL.Query().Get("job_id")
+
 			job, err := func() (*work.Job, error) {
 				jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
 					Namespace: namespace,
@@ -72,6 +73,7 @@ func NewServer(opts *ServerOptions) http.Handler {
 			}
 			namespace := r.URL.Query().Get("namespace")
 			jobID := r.URL.Query().Get("job_id")
+
 			job, err := func() (*work.Job, error) {
 				jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
 					Namespace: namespace,
