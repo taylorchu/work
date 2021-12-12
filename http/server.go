@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -24,8 +23,8 @@ func NewServer(opts *ServerOptions) http.Handler {
 				return
 			}
 			namespace := r.URL.Query().Get("namespace")
-			jobID := r.URL.Query().Get("job_id")
 			queueID := r.URL.Query().Get("queue_id")
+			jobID := r.URL.Query().Get("job_id")
 			job, err := func() (*work.Job, error) {
 				jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
 					Namespace: namespace,
@@ -208,28 +207,4 @@ func jobStatus(job *work.Job) string {
 		return "scheduled"
 	}
 	return "ready"
-}
-
-type Duration time.Duration
-
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Duration(d).String())
-}
-
-func (d *Duration) UnmarshalJSON(b []byte) error {
-	var v interface{}
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-	switch value := v.(type) {
-	case string:
-		tmp, err := time.ParseDuration(value)
-		if err != nil {
-			return err
-		}
-		*d = Duration(tmp)
-		return nil
-	default:
-		return fmt.Errorf("invalid duration: %v", v)
-	}
 }
