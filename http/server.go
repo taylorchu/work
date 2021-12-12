@@ -17,7 +17,10 @@ func NewServer(opts *ServerOptions) http.Handler {
 	m.HandleFunc("/jobs", func(rw http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "DELETE":
-			queue, ok := opts.Queue.(work.BulkJobFinder)
+			queue, ok := opts.Queue.(interface {
+				work.Queue
+				work.BulkJobFinder
+			})
 			if !ok {
 				rw.WriteHeader(http.StatusNotFound)
 				return
@@ -34,7 +37,7 @@ func NewServer(opts *ServerOptions) http.Handler {
 					return nil, err
 				}
 				if len(jobs) == 1 && jobs[0] != nil {
-					err := opts.Queue.Ack(jobs[0], &work.AckOptions{
+					err := queue.Ack(jobs[0], &work.AckOptions{
 						Namespace: namespace,
 						QueueID:   queueID,
 					})
@@ -66,7 +69,10 @@ func NewServer(opts *ServerOptions) http.Handler {
 				Job:       job,
 			})
 		case "GET":
-			queue, ok := opts.Queue.(work.BulkJobFinder)
+			queue, ok := opts.Queue.(interface {
+				work.Queue
+				work.BulkJobFinder
+			})
 			if !ok {
 				rw.WriteHeader(http.StatusNotFound)
 				return
@@ -159,7 +165,10 @@ func NewServer(opts *ServerOptions) http.Handler {
 	m.HandleFunc("/metrics", func(rw http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "GET":
-			queue, ok := opts.Queue.(work.MetricsExporter)
+			queue, ok := opts.Queue.(interface {
+				work.Queue
+				work.MetricsExporter
+			})
 			if !ok {
 				rw.WriteHeader(http.StatusNotFound)
 				return
