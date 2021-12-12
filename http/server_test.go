@@ -88,20 +88,20 @@ func TestServer(t *testing.T) {
 		},
 		{
 			reqMethod: "DELETE",
-			reqURL:    "http://example.com/jobs?namespace=ns1&job_id=xxx",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=xxx",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"ns1\",\"queue_id\":\"\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/jobs?namespace=ns1&job_id=xxx",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=xxx",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"ns1\",\"status\":\"completed\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"status\":\"completed\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
 		},
 		{
 			// bad duration
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
 			reqBody: `{
 				"payload": "payload1",
 				"delay": 1
@@ -112,14 +112,14 @@ func TestServer(t *testing.T) {
 		{
 			// bad payload
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
 			reqBody:   `{`,
 			respCode:  500,
 			respBody:  "{\"error\":\"unexpected EOF\"}\n",
 		},
 		{
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
 			reqBody: `{
 				"payload": "payload1",
 				"delay": "10s"
@@ -128,13 +128,13 @@ func TestServer(t *testing.T) {
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/metrics?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"ns1\",\"queue_id\":\"q1\",\"ready_total\":0,\"scheduled_total\":1,\"total\":1}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":0,\"scheduled_total\":1,\"total\":1}\n",
 		},
 		{
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
 			reqBody: `{
 				"payload": "payload1"
 			}`,
@@ -142,13 +142,13 @@ func TestServer(t *testing.T) {
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/metrics?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"ns1\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2}\n",
 		},
 		{
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
 			reqBody: `{
 				"id": "id1",
 				"payload": "payload1"
@@ -157,31 +157,31 @@ func TestServer(t *testing.T) {
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/metrics?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"ns1\",\"queue_id\":\"q1\",\"ready_total\":2,\"scheduled_total\":1,\"total\":3}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":2,\"scheduled_total\":1,\"total\":3}\n",
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/jobs?namespace=ns1&job_id=id1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
 			respCode:  200,
 		},
 		{
 			reqMethod: "DELETE",
-			reqURL:    "http://example.com/jobs?namespace=ns1&job_id=id1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
 			respCode:  500,
 			respBody:  "{\"error\":\"work: empty queue id\"}\n",
 		},
 		{
 			reqMethod: "DELETE",
-			reqURL:    "http://example.com/jobs?namespace=ns1&queue_id=q1&job_id=id1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=id1",
 			respCode:  200,
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/metrics?namespace=ns1&queue_id=q1",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"ns1\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2}\n",
 		},
 	} {
 		var reqBody io.Reader
