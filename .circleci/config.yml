@@ -35,7 +35,7 @@ jobs:
           - "7000"
           - --cluster-config-file
           - 7000.conf
-      - image: redis:5-alpine
+      - image: << parameters.redis-image >>
         command:
           - --cluster-enabled
           - "yes"
@@ -43,7 +43,7 @@ jobs:
           - "7001"
           - --cluster-config-file
           - 7001.conf
-      - image: redis:5-alpine
+      - image: << parameters.redis-image >>
         command:
           - --cluster-enabled
           - "yes"
@@ -92,4 +92,5 @@ workflows:
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
+                - eqalpha/keydb
       - fossa
