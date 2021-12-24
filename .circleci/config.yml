@@ -64,6 +64,7 @@ jobs:
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
+      - run: apk add --no-cache curl bash
       - run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash
       - run: fossa analyze
