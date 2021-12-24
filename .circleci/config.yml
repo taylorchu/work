@@ -1,23 +1,33 @@
-version: 2
+version: 2.1
 jobs:
-  redis5:
+  redis:
+    parameters:
+      redis-image:
+        type: string
+      go-image:
+        type: string
     docker:
-      - image: circleci/golang:1.17
+      - image: << parameters.go-image >>
         environment:
           - GO111MODULE=on
-      - image: redis:5-alpine
+      - image: << parameters.redis-image >>
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
       - run: dockerize -wait tcp://:6379
       - run: go test -p 1 -v ./...
-  redis5-cluster:
+  redis-cluster:
+    parameters:
+      redis-image:
+        type: string
+      go-image:
+        type: string
     docker:
-      - image: circleci/golang:1.17
+      - image: << parameters.go-image >>
         environment:
           - GO111MODULE=on
           - REDIS_ADDR=:7000,:7001,:7002
-      - image: redis:5-alpine
+      - image: << parameters.redis-image >>
         command:
           - --cluster-enabled
           - "yes"
@@ -25,7 +35,7 @@ jobs:
           - "7000"
           - --cluster-config-file
           - 7000.conf
-      - image: redis:5-alpine
+      - image: << parameters.redis-image >>
         command:
           - --cluster-enabled
           - "yes"
@@ -33,7 +43,7 @@ jobs:
           - "7001"
           - --cluster-config-file
           - 7001.conf
-      - image: redis:5-alpine
+      - image: << parameters.redis-image >>
         command:
           - --cluster-enabled
           - "yes"
@@ -47,74 +57,14 @@ jobs:
       - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
       - run: sudo apt-get install redis-tools
       - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002
-      - run: go test -p 1 -v ./...
-  redis6:
-    docker:
-      - image: circleci/golang:1.17
-        environment:
-          - GO111MODULE=on
-      - image: redis:6-alpine
-    working_directory: /go/src/github.com/taylorchu/work
-    steps:
-      - checkout
-      - run: dockerize -wait tcp://:6379
-      - run: go test -p 1 -v ./...
-  redis6-cluster:
-    docker:
-      - image: circleci/golang:1.17
-        environment:
-          - GO111MODULE=on
-          - REDIS_ADDR=:7000,:7001,:7002
-      - image: redis:6-alpine
-        command:
-          - --cluster-enabled
-          - "yes"
-          - --port
-          - "7000"
-          - --cluster-config-file
-          - 7000.conf
-      - image: redis:6-alpine
-        command:
-          - --cluster-enabled
-          - "yes"
-          - --port
-          - "7001"
-          - --cluster-config-file
-          - 7001.conf
-      - image: redis:6-alpine
-        command:
-          - --cluster-enabled
-          - "yes"
-          - --port
-          - "7002"
-          - --cluster-config-file
-          - 7002.conf
-    working_directory: /go/src/github.com/taylorchu/work
-    steps:
-      - checkout
-      - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
-      - run: sudo apt-get install redis-tools
-      - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002
-      - run: go test -p 1 -v ./...
-  keydb:
-    docker:
-      - image: circleci/golang:1.17
-        environment:
-          - GO111MODULE=on
-      - image: eqalpha/keydb
-    working_directory: /go/src/github.com/taylorchu/work
-    steps:
-      - checkout
-      - run: dockerize -wait tcp://:6379
       - run: go test -p 1 -v ./...
   fossa:
     docker:
-      - image: circleci/golang:1.17
-        environment:
-          - GO111MODULE=on
+      - image: alpine
     working_directory: /go/src/github.com/taylorchu/work
     steps:
       - checkout
+      - run: apk add --no-cache curl bash
       - run: |
           curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash
       - run: fossa analyze
@@ -123,9 +73,24 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - redis5
-      - redis6
-      - redis5-cluster
-      - redis6-cluster
-      - keydb
+      - redis:
+          matrix:
+            parameters:
+              go-image:
+                - circleci/golang:1.17
+                - circleci/golang:1.16
+              redis-image:
+                - redis:5-alpine
+                - redis:6-alpine
+                - eqalpha/keydb
+      - redis-cluster:
+          matrix:
+            parameters:
+              go-image:
+                - circleci/golang:1.17
+                - circleci/golang:1.16
+              redis-image:
+                - redis:5-alpine
+                - redis:6-alpine
+                - eqalpha/keydb
       - fossa
