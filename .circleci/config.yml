@@ -66,7 +66,7 @@ jobs:
       - checkout
       - run: apk add --no-cache curl bash
       - run: |
-          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install.sh | bash
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
       - run: fossa analyze
       - run: fossa test
 workflows:
