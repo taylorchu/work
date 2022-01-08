@@ -76,18 +76,6 @@ type JobOptions struct {
 	HandleMiddleware  []HandleMiddleware
 }
 
-// AddDequeueMiddleware adds DequeueMiddleware.
-func (opt *JobOptions) AddDequeueMiddleware(mw DequeueMiddleware) *JobOptions {
-	opt.DequeueMiddleware = append(opt.DequeueMiddleware, mw)
-	return opt
-}
-
-// AddHandleMiddleware adds HandleMiddleware.
-func (opt *JobOptions) AddHandleMiddleware(mw HandleMiddleware) *JobOptions {
-	opt.HandleMiddleware = append(opt.HandleMiddleware, mw)
-	return opt
-}
-
 // options validation error
 var (
 	ErrMaxExecutionTime = errors.New("work: max execution time should be > 0")
@@ -144,18 +132,6 @@ type OnceJobOptions struct {
 
 	DequeueMiddleware []DequeueMiddleware
 	HandleMiddleware  []HandleMiddleware
-}
-
-// AddDequeueMiddleware adds DequeueMiddleware.
-func (opt *OnceJobOptions) AddDequeueMiddleware(mw DequeueMiddleware) *OnceJobOptions {
-	opt.DequeueMiddleware = append(opt.DequeueMiddleware, mw)
-	return opt
-}
-
-// AddHandleMiddleware adds HandleMiddleware.
-func (opt *OnceJobOptions) AddHandleMiddleware(mw HandleMiddleware) *OnceJobOptions {
-	opt.HandleMiddleware = append(opt.HandleMiddleware, mw)
-	return opt
 }
 
 // Validate validates OnceJobOptions.
