@@ -31,8 +31,9 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 
 	for k := 1; k <= 1000; k *= 10 {
 		b.Run(fmt.Sprintf("work_v1_%d", k), func(b *testing.B) {
+			b.StopTimer()
+
 			for n := 0; n < b.N; n++ {
-				b.StopTimer()
 				require.NoError(b, redistest.Reset(client))
 
 				wp := work.NewWorkerPoolWithOptions(
@@ -60,11 +61,13 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 				wp.Start()
 				wg.Wait()
 				wp.Stop()
+				b.StopTimer()
 			}
 		})
 		b.Run(fmt.Sprintf("work_v2_%d", k), func(b *testing.B) {
+			b.StopTimer()
+
 			for n := 0; n < b.N; n++ {
-				b.StopTimer()
 				require.NoError(b, redistest.Reset(client))
 
 				queue := work2.NewRedisQueue(client)
@@ -102,6 +105,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 				w.Start()
 				wg.Wait()
 				w.Stop()
+				b.StopTimer()
 			}
 		})
 	}
