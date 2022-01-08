@@ -7,7 +7,7 @@ require (
 	github.com/gocraft/work v0.5.2-0.20180912175354-c85b71e20062
 	github.com/gomodule/redigo v1.8.5
 	github.com/stretchr/testify v1.7.0
-	github.com/taylorchu/work v0.2.3-0.20211224185425-95221ffce1ae
+	github.com/taylorchu/work v0.2.3-0.20220108165454-20ff130b9ff4
 )
 
 require (

@@ -54,8 +54,8 @@ github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.0 h1:nwc3DEeHmmLAfoZucVR881uASk0Mfjw8xYJ99tb5CcY=
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
-github.com/taylorchu/work v0.2.3-0.20211224185425-95221ffce1ae h1:2ISrAlvAWYmcsDygQu++wyOL7zPBfof/GZQpU4UwG/o=
-github.com/taylorchu/work v0.2.3-0.20211224185425-95221ffce1ae/go.mod h1:xMoGkfLklPrd9fznMeUHuOaSZMjHM/xUe2QMN6m/6x4=
+github.com/taylorchu/work v0.2.3-0.20220108165454-20ff130b9ff4 h1:vSeI45SGQ91mWBE++I3dyW5UNnokoIS5QMo45Z9+SB8=
+github.com/taylorchu/work v0.2.3-0.20220108165454-20ff130b9ff4/go.mod h1:xMoGkfLklPrd9fznMeUHuOaSZMjHM/xUe2QMN6m/6x4=
 github.com/vmihailenco/msgpack/v5 v5.3.5 h1:5gO0H1iULLWGhs2H5tbAHIZTV8/cYafcFOr9znI5mJU=
 github.com/vmihailenco/msgpack/v5 v5.3.5/go.mod h1:7xyJ9e+0+9SaZT0Wt1RGleJXzli6Q/V5KbhBonMG9jc=
 github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAhO7/IwNM9g=
