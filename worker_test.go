@@ -189,6 +189,86 @@ func TestWorkerRunJobMultiQueue(t *testing.T) {
 	require.EqualValues(t, 0, count)
 }
 
+func TestLostJob(t *testing.T) {
+	/*
+		Within the same queue:
+
+			1. Job with id "X" is enqueued
+			2. Job with id "X" is dequeued by worker №1
+			3. Job with id "X" is enqueued
+			4. Handler of worker №1 returns without error
+			5. Worker №1 flushes ACK
+			6. Job enqueued at step 3 is lost
+	*/
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+
+	w := NewWorker(&WorkerOptions{
+		Namespace: "{ns1}",
+		Queue:     NewRedisQueue(client),
+	})
+	successTaken := make(chan struct{})
+	successDone := make(chan struct{})
+	err := w.Register("success",
+		func(*Job, *DequeueOptions) error {
+			close(successTaken)
+			<-successDone
+			return nil
+		},
+		&JobOptions{
+			MaxExecutionTime: time.Minute,
+			IdleWait:         time.Millisecond * 60,
+			NumGoroutines:    1,
+		},
+	)
+	require.NoError(t, err)
+
+	type message struct {
+		Text string
+	}
+	job := NewJob()
+	job.ID = "X"
+	err = job.MarshalPayload(message{Text: "hello"})
+	require.NoError(t, err)
+
+	err = w.opt.Queue.Enqueue(job, &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "success",
+	})
+	require.NoError(t, err)
+
+	const queueKey = "{ns1}:queue:success"
+
+	count, err := client.ZCard(context.Background(), queueKey).Result()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+
+	w.Start()
+	<-successTaken
+
+	err = w.opt.Queue.Enqueue(job, &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "success",
+	})
+	require.NoError(t, err)
+
+	close(successDone)
+
+	time.Sleep(flushIntv * 2) // Should get flushed after this
+
+	z, err := client.ZRangeByScoreWithScores(
+		context.Background(),
+		queueKey,
+		&redis.ZRangeBy{
+			Min: "-inf",
+			Max: "+inf",
+		}).Result()
+	require.NoError(t, err)
+	require.Len(t, z, 1)
+	w.Stop()
+}
+
 func TestWorkerRunJob(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()

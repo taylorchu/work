@@ -212,6 +212,9 @@ func (w *Worker) Start() {
 	}
 }
 
+// XXX: make this configurable ?
+const flushIntv = time.Second
+
 func (w *Worker) start(ctx context.Context, h handler) {
 	defer w.wg.Done()
 
@@ -276,7 +279,6 @@ func (w *Worker) start(ctx context.Context, h handler) {
 		}
 	}()
 
-	const flushIntv = time.Second
 	flushTicker := time.NewTicker(flushIntv)
 	defer flushTicker.Stop()
 
