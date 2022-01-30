@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -274,10 +275,23 @@ func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, e
 	if err != nil {
 		return nil, err
 	}
+	z, err := q.client.ZRangeByScoreWithScores(context.Background(), queueKey, &redis.ZRangeBy{
+		Min:   "-inf",
+		Max:   now,
+		Count: 1,
+	}).Result()
+	if err != nil {
+		return nil, err
+	}
+	var latency time.Duration
+	if len(z) > 0 {
+		latency = time.Since(time.Unix(int64(z[0].Score), 0))
+	}
 	return &QueueMetrics{
 		Namespace:      opt.Namespace,
 		QueueID:        opt.QueueID,
 		ReadyTotal:     readyTotal,
 		ScheduledTotal: scheduledTotal,
+		Latency:        latency,
 	}, nil
 }

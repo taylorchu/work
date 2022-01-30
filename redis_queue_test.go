@@ -313,6 +313,7 @@ func TestRedisQueueGetQueueMetrics(t *testing.T) {
 	require.Equal(t, "q1", m.QueueID)
 	require.EqualValues(t, 1, m.ReadyTotal)
 	require.EqualValues(t, 0, m.ScheduledTotal)
+	require.True(t, 0 < m.Latency && m.Latency < time.Minute)
 
 	m, err = q.GetQueueMetrics(&QueueMetricsOptions{
 		Namespace: "{ns1}",
@@ -324,4 +325,5 @@ func TestRedisQueueGetQueueMetrics(t *testing.T) {
 	require.Equal(t, "q1", m.QueueID)
 	require.EqualValues(t, 0, m.ReadyTotal)
 	require.EqualValues(t, 1, m.ScheduledTotal)
+	require.True(t, m.Latency == 0)
 }

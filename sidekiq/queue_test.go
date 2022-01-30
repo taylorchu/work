@@ -406,6 +406,7 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 	require.Equal(t, "low/q1", m.QueueID)
 	require.EqualValues(t, 1, m.ReadyTotal)
 	require.EqualValues(t, 0, m.ScheduledTotal)
+	require.True(t, 0 < m.Latency && m.Latency < time.Minute)
 
 	m, err = q.GetQueueMetrics(&work.QueueMetricsOptions{
 		Namespace: "{ns1}",
@@ -417,6 +418,7 @@ func TestSidekiqQueueGetQueueMetrics(t *testing.T) {
 	require.Equal(t, "low/q1", m.QueueID)
 	require.EqualValues(t, 0, m.ReadyTotal)
 	require.EqualValues(t, 1, m.ScheduledTotal)
+	require.True(t, m.Latency == 0)
 }
 
 func TestSidekiqQueueEnqueueDuplicated(t *testing.T) {

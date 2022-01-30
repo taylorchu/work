@@ -188,17 +188,19 @@ func (opts *ServerOptions) getMetrics(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(rw).Encode(struct {
-		Namespace      string `json:"namespace"`
-		QueueID        string `json:"queue_id"`
-		ReadyTotal     int64  `json:"ready_total"`
-		ScheduledTotal int64  `json:"scheduled_total"`
-		Total          int64  `json:"total"`
+		Namespace      string        `json:"namespace"`
+		QueueID        string        `json:"queue_id"`
+		ReadyTotal     int64         `json:"ready_total"`
+		ScheduledTotal int64         `json:"scheduled_total"`
+		Total          int64         `json:"total"`
+		Latency        time.Duration `json:"latency"`
 	}{
 		Namespace:      metrics.Namespace,
 		QueueID:        metrics.QueueID,
 		ReadyTotal:     metrics.ReadyTotal,
 		ScheduledTotal: metrics.ScheduledTotal,
 		Total:          metrics.ReadyTotal + metrics.ScheduledTotal,
+		Latency:        metrics.Latency,
 	})
 }
 
