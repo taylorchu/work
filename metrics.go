@@ -10,6 +10,8 @@ type QueueMetrics struct {
 	ReadyTotal int64
 	// Total number of jobs that are scheduled to run in future.
 	ScheduledTotal int64
+	// Processing delay from oldest ready job
+	Latency time.Duration
 }
 
 // MetricsExporter can be implemented by Queue to report metrics.

@@ -4,10 +4,12 @@ import (
 	"errors"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
+	"github.com/taylorchu/work/redistest"
 )
 
 func TestHandleFuncMetrics(t *testing.T) {
@@ -65,6 +67,40 @@ func TestEnqueueFuncMetrics(t *testing.T) {
 
 	for _, m := range []string{
 		`work_job_enqueued_total{`,
+	} {
+		require.Contains(t, r.Body.String(), m)
+	}
+}
+
+func TestExportWorkerMetrics(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+
+	w := work.NewWorker(&work.WorkerOptions{
+		Namespace: "{ns1}",
+		Queue:     work.NewRedisQueue(client),
+	})
+	err := w.Register("test",
+		func(*work.Job, *work.DequeueOptions) error { return nil },
+		&work.JobOptions{
+			MaxExecutionTime: time.Second,
+			IdleWait:         time.Second,
+			NumGoroutines:    2,
+		},
+	)
+	require.NoError(t, err)
+
+	err = ExportWorkerMetrics(w)
+	require.NoError(t, err)
+
+	r := httptest.NewRecorder()
+	promhttp.Handler().ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
+
+	for _, m := range []string{
+		`job_ready{`,
+		`job_scheduled{`,
+		`job_latency_seconds_bucket{`,
 	} {
 		require.Contains(t, r.Body.String(), m)
 	}

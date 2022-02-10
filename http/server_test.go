@@ -130,7 +130,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":0,\"scheduled_total\":1,\"total\":1}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":0,\"scheduled_total\":1,\"total\":1,\"latency\":0}\n",
 		},
 		{
 			reqMethod: "POST",
@@ -144,7 +144,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2,\"latency\":[0-9]+}\n",
 		},
 		{
 			reqMethod: "POST",
@@ -159,7 +159,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":2,\"scheduled_total\":1,\"total\":3}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":2,\"scheduled_total\":1,\"total\":3,\"latency\":[0-9]+}\n",
 		},
 		{
 			reqMethod: "GET",
@@ -181,7 +181,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2}\n",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2,\"latency\":[0-9]+}\n",
 		},
 	} {
 		var reqBody io.Reader
@@ -192,7 +192,7 @@ func TestServer(t *testing.T) {
 		w := httptest.NewRecorder()
 		srv.ServeHTTP(w, req)
 		if !(test.respBody == "" && test.respCode == 200) {
-			require.Equal(t, test.respBody, w.Body.String())
+			require.Regexp(t, test.respBody, w.Body.String())
 		} else {
 			t.Logf("response: %q", w.Body.String())
 		}
