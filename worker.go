@@ -114,12 +114,8 @@ func (w *Worker) RegisterWithContext(queueID string, h ContextHandleFunc, opt *J
 		return err
 	}
 	w.handlerMap[queueID] = handler{
-		QueueID: queueID,
-		HandleFunc: func(ctx context.Context, job *Job, o *DequeueOptions) error {
-			ctx, cancel := context.WithTimeout(ctx, opt.MaxExecutionTime)
-			defer cancel()
-			return h(ctx, job, o)
-		},
+		QueueID:    queueID,
+		HandleFunc: h,
 		JobOptions: *opt,
 	}
 	return nil
@@ -207,151 +203,52 @@ func (w *Worker) Start() {
 	for _, h := range w.handlerMap {
 		for i := int64(0); i < h.JobOptions.NumGoroutines; i++ {
 			w.wg.Add(1)
-			go w.start(ctx, h)
+			go func(h handler) {
+				defer w.wg.Done()
+
+				w.start(ctx, h)
+			}(h)
 		}
 	}
 }
 
 func (w *Worker) start(ctx context.Context, h handler) {
-	defer w.wg.Done()
-
-	queue := w.opt.Queue
-	ns := w.opt.Namespace
-
 	// print errors by default so that problems are noticeable.
 	errFunc := func(err error) { fmt.Println(err) }
 	if w.opt.ErrorFunc != nil {
 		errFunc = w.opt.ErrorFunc
 	}
 
-	dequeue := getDequeueFunc(queue)
-	for _, mw := range h.JobOptions.DequeueMiddleware {
-		dequeue = mw(dequeue)
-	}
-	dequeue = idleWait(ctx, h.JobOptions.IdleWait)(dequeue)
+	var dequeueMiddleware []DequeueMiddleware
+	dequeueMiddleware = append(dequeueMiddleware, h.JobOptions.DequeueMiddleware...)
+	dequeueMiddleware = append(dequeueMiddleware, idleWait(ctx, h.JobOptions.IdleWait))
 
-	handle := func(job *Job, o *DequeueOptions) error {
-		return h.HandleFunc(ctx, job, o)
-	}
-	for _, mw := range h.JobOptions.HandleMiddleware {
-		handle = mw(handle)
-	}
-	handle = catchPanic(handle)
+	var handleMiddleware []HandleMiddleware
+	handleMiddleware = append(handleMiddleware, h.JobOptions.HandleMiddleware...)
+	handleMiddleware = append(handleMiddleware, catchPanic, wrapHandlerError)
 
-	b := h.JobOptions.Backoff
-	if b == nil {
-		b = defaultBackoff()
+	opt := &OnceJobOptions{
+		MaxExecutionTime:  h.JobOptions.MaxExecutionTime,
+		Backoff:           h.JobOptions.Backoff,
+		DequeueMiddleware: dequeueMiddleware,
+		HandleMiddleware:  handleMiddleware,
 	}
-	handle = retry(queue, b)(handle)
-
-	// prepare bulk ack flush
-	var ackJobs []*Job
-	flush := func() error {
-		opt := &AckOptions{
-			Namespace: ns,
-			QueueID:   h.QueueID,
-		}
-		bulkDeq, ok := queue.(BulkDequeuer)
-		if ok {
-			err := bulkDeq.BulkAck(ackJobs, opt)
-			if err != nil {
-				return err
-			}
-			ackJobs = nil
-			return nil
-		}
-		for _, job := range ackJobs {
-			err := queue.Ack(job, opt)
-			if err != nil {
-				return err
-			}
-		}
-		ackJobs = nil
-		return nil
-	}
-	defer func() {
-		err := flush()
-		if err != nil {
-			errFunc(err)
-		}
-	}()
-
-	const flushIntv = time.Second
-	flushTicker := time.NewTicker(flushIntv)
-	defer flushTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-flushTicker.C:
-			err := flush()
-			if err != nil {
-				errFunc(err)
-			}
 		default:
-			func() error {
-				opt := &DequeueOptions{
-					Namespace:    ns,
-					QueueID:      h.QueueID,
-					At:           time.Now(),
-					InvisibleSec: int64((h.JobOptions.MaxExecutionTime + flushIntv) / time.Second),
-				}
-				job, err := dequeue(opt)
-				if err != nil {
-					if !errors.Is(err, ErrEmptyQueue) {
-						errFunc(err)
-					}
-					return err
-				}
-				err = handle(job, opt)
-				if err != nil {
-					return err
-				}
-				ackJobs = append(ackJobs, job)
-				if len(ackJobs) >= 1000 {
-					// prevent un-acked job count to be too large
-					err := flush()
-					if err != nil {
-						errFunc(err)
-						return err
-					}
-				}
-				return nil
-			}()
-		}
-	}
-}
-
-func getDequeueFunc(queue Queue) DequeueFunc {
-	bulkDeq, ok := queue.(BulkDequeuer)
-	if !ok {
-		return queue.Dequeue
-	}
-
-	var jobs []*Job
-	return func(opt *DequeueOptions) (*Job, error) {
-		if len(jobs) == 0 {
-			// this is an optimization to reduce system calls.
-			//
-			// there could be an idle period on startup
-			// because worker previously pulls in too many jobs.
-			count := 60 / opt.InvisibleSec
-			if count <= 0 {
-				count = 1
-			}
-			bulkOpt := *opt
-			bulkOpt.InvisibleSec *= count
-
-			var err error
-			jobs, err = bulkDeq.BulkDequeue(count, &bulkOpt)
+			err := w.RunOnce(ctx, h.QueueID, h.HandleFunc, opt)
 			if err != nil {
-				return nil, err
+				var wrappedError *wrappedHandlerError
+				if errors.As(err, &wrappedError) {
+				} else if errors.Is(err, ErrEmptyQueue) {
+				} else {
+					errFunc(err)
+				}
 			}
 		}
-		job := jobs[0]
-		jobs = jobs[1:]
-		return job, nil
 	}
 }
 
@@ -403,6 +300,24 @@ func idleWait(ctx context.Context, d time.Duration) DequeueMiddleware {
 			}
 			return job, nil
 		}
+	}
+}
+
+type wrappedHandlerError struct {
+	Err error
+}
+
+func (e *wrappedHandlerError) Error() string {
+	return e.Err.Error()
+}
+
+func wrapHandlerError(f HandleFunc) HandleFunc {
+	return func(job *Job, opt *DequeueOptions) error {
+		err := f(job, opt)
+		if err != nil {
+			return &wrappedHandlerError{Err: err}
+		}
+		return nil
 	}
 }
 
