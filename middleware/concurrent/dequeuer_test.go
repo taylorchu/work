@@ -17,12 +17,6 @@ func TestDequeuer(t *testing.T) {
 	defer client.Close()
 	require.NoError(t, redistest.Reset(client))
 
-	opt := &work.DequeueOptions{
-		Namespace:    "{ns1}",
-		QueueID:      "q1",
-		At:           time.Now(),
-		InvisibleSec: 60,
-	}
 	var called int
 	h1 := func(*work.DequeueOptions) (*work.Job, error) {
 		called++
@@ -41,6 +35,13 @@ func TestDequeuer(t *testing.T) {
 			return err
 		}
 		return nil
+	}
+
+	opt := &work.DequeueOptions{
+		Namespace:    "{ns1}",
+		QueueID:      "q1",
+		At:           time.Now(),
+		InvisibleSec: 60,
 	}
 
 	for i := 0; i < 3; i++ {
@@ -156,12 +157,6 @@ func BenchmarkConcurrency(b *testing.B) {
 	defer client.Close()
 	require.NoError(b, redistest.Reset(client))
 
-	opt := &work.DequeueOptions{
-		Namespace:    "{ns1}",
-		QueueID:      "q1",
-		At:           time.Now(),
-		InvisibleSec: 60,
-	}
 	var called int
 	h1 := func(*work.DequeueOptions) (*work.Job, error) {
 		called++
@@ -180,6 +175,13 @@ func BenchmarkConcurrency(b *testing.B) {
 			return err
 		}
 		return nil
+	}
+
+	opt := &work.DequeueOptions{
+		Namespace:    "{ns1}",
+		QueueID:      "q1",
+		At:           time.Now(),
+		InvisibleSec: 60,
 	}
 
 	m1, m2 := Dequeuer(&DequeuerOptions{

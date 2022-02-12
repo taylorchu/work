@@ -9,12 +9,6 @@ import (
 )
 
 func TestLocalDequeuer(t *testing.T) {
-	opt := &work.DequeueOptions{
-		Namespace:    "{ns1}",
-		QueueID:      "q1",
-		At:           time.Now(),
-		InvisibleSec: 60,
-	}
 	var called int
 	h1 := func(*work.DequeueOptions) (*work.Job, error) {
 		called++
@@ -33,6 +27,13 @@ func TestLocalDequeuer(t *testing.T) {
 			return err
 		}
 		return nil
+	}
+
+	opt := &work.DequeueOptions{
+		Namespace:    "{ns1}",
+		QueueID:      "q1",
+		At:           time.Now(),
+		InvisibleSec: 60,
 	}
 
 	m1, m2 := LocalDequeuer(&LocalDequeuerOptions{
