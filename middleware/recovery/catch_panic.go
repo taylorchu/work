@@ -23,3 +23,5 @@ func CatchPanic(f work.HandleFunc) work.HandleFunc {
 		return f(job, opt)
 	}
 }
+
+var _ work.HandleMiddleware = CatchPanic
