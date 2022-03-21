@@ -307,6 +307,10 @@ type wrappedHandlerError struct {
 	Err error
 }
 
+func (e *wrappedHandlerError) Unwrap() error {
+	return e.Err
+}
+
 func (e *wrappedHandlerError) Error() string {
 	return e.Err.Error()
 }

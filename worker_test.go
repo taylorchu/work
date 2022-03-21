@@ -419,6 +419,12 @@ func TestWorkerRunOnce(t *testing.T) {
 	require.EqualValues(t, 1, count)
 }
 
+func TestWrappedHandlerError(t *testing.T) {
+	errInner := errors.New("test")
+	errOuter := &wrappedHandlerError{Err: errInner}
+	require.True(t, errors.Is(errOuter, errInner))
+}
+
 func TestRetry(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
