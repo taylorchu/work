@@ -16,6 +16,8 @@ type redisQueue struct {
 	dequeueScript *redis.Script
 	ackScript     *redis.Script
 	findScript    *redis.Script
+
+	timestampResolution time.Duration
 }
 
 // RedisQueue implements Queue with other additional capabilities
@@ -27,8 +29,19 @@ type RedisQueue interface {
 	MetricsExporter
 }
 
+type RedisQueueOption func(*redisQueue)
+
+// WithTimestampResolution allows to override resolution for timestamps
+// used for setting job delay.
+// Default resolution is second.
+func WithTimestampResolution(resolution time.Duration) RedisQueueOption {
+	return func(q *redisQueue) {
+		q.timestampResolution = resolution
+	}
+}
+
 // NewRedisQueue creates a new queue stored in redis.
-func NewRedisQueue(client redis.UniversalClient) RedisQueue {
+func NewRedisQueue(client redis.UniversalClient, options ...RedisQueueOption) RedisQueue {
 	enqueueScript := redis.NewScript(`
 	local ns = ARGV[1]
 	local queue_id = ARGV[2]
@@ -131,13 +144,19 @@ func NewRedisQueue(client redis.UniversalClient) RedisQueue {
 	return ret
 	`)
 
-	return &redisQueue{
-		client:        client,
-		enqueueScript: enqueueScript,
-		dequeueScript: dequeueScript,
-		ackScript:     ackScript,
-		findScript:    findScript,
+	q := &redisQueue{
+		client:              client,
+		enqueueScript:       enqueueScript,
+		dequeueScript:       dequeueScript,
+		ackScript:           ackScript,
+		findScript:          findScript,
+		timestampResolution: time.Second,
 	}
+
+	for _, optin := range options {
+		optin(q)
+	}
+	return q
 }
 
 func (q *redisQueue) Enqueue(job *Job, opt *EnqueueOptions) error {
@@ -160,7 +179,7 @@ func (q *redisQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 		if err != nil {
 			return err
 		}
-		args[2+3*i] = job.EnqueuedAt.Unix()
+		args[2+3*i] = q.resolveTimestamp(job.EnqueuedAt)
 		args[2+3*i+1] = job.ID
 		args[2+3*i+2] = jobm
 	}
@@ -183,7 +202,7 @@ func (q *redisQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, erro
 	res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
 		opt.Namespace,
 		opt.QueueID,
-		opt.At.Unix(),
+		q.resolveTimestamp(opt.At),
 		opt.InvisibleSec,
 		count,
 	).Result()
@@ -294,4 +313,8 @@ func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, e
 		ScheduledTotal: scheduledTotal,
 		Latency:        latency,
 	}, nil
+}
+
+func (q *redisQueue) resolveTimestamp(t time.Time) int64 {
+	return t.UnixNano() / (int64(q.timestampResolution) / int64(time.Nanosecond))
 }
