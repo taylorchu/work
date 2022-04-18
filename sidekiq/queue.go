@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/google/uuid"
 	"github.com/taylorchu/work"
+	"github.com/taylorchu/work/redislock"
 )
 
 type sidekiqQueue struct {
@@ -100,21 +102,7 @@ func NewQueue(client redis.UniversalClient) Queue {
 		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
 	end
 
-	local index = 1
-	while true do
-		local jobms = redis.call("lrange", queue_key, -index, -index)
-		if table.getn(jobms) > 0 then
-			local jobm = jobms[1]
-			local invisible_key = table.concat({queue_key, "invisible", jobm}, ":")
-			if redis.call("set", invisible_key, 1, "ex", 30, "nx") then
-				return jobm
-			end
-		else
-			break
-		end
-		index = index + 1
-	end
-	return nil
+	return redis.call("lindex", queue_key, -1)
 	`)
 
 	ackScript := redis.NewScript(`
@@ -126,10 +114,8 @@ func NewQueue(client redis.UniversalClient) Queue {
 	if sidekiq_ns ~= "" then
 		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
 	end
-	local invisible_key = table.concat({queue_key, "invisible", jobm}, ":")
 
-	redis.call("lrem", queue_key, -1, jobm)
-	return redis.call("del", invisible_key)
+	return redis.call("lrem", queue_key, -1, jobm)
 	`)
 
 	scheduleScript := redis.NewScript(`
@@ -220,15 +206,29 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	if err != nil {
 		return err
 	}
-	for {
+	pull := func() error {
+		lock := &redislock.Lock{
+			Client:       q.client,
+			Key:          fmt.Sprintf("%s:sidekiq-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue),
+			ID:           uuid.NewString(),
+			At:           time.Now(),
+			ExpireInSec:  30,
+			MaxAcquirers: 1,
+		}
+		acquired, err := lock.Acquire()
+		if err != nil {
+			return err
+		}
+		if !acquired {
+			return nil
+		}
+		defer lock.Release()
+
 		res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
 			opt.SidekiqNamespace,
 			opt.SidekiqQueue,
 		).Result()
 		if err != nil {
-			if err == redis.Nil {
-				return nil
-			}
 			return err
 		}
 		var sqJob sidekiqJob
@@ -257,6 +257,17 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 			res.(string),
 		).Err()
 		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	for {
+		err := pull()
+		if err != nil {
+			if err == redis.Nil {
+				return nil
+			}
 			return err
 		}
 	}
