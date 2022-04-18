@@ -18,6 +18,7 @@ type sidekiqQueue struct {
 	enqueueScript   *redis.Script
 	enqueueInScript *redis.Script
 	dequeueScript   *redis.Script
+	ackScript       *redis.Script
 	scheduleScript  *redis.Script
 }
 
@@ -89,8 +90,7 @@ func NewQueue(client redis.UniversalClient) Queue {
 	`)
 
 	// https://github.com/mperham/sidekiq/blob/455e9d56f46f0299eaf3b761596207e15f906a39/lib/sidekiq/fetch.rb#L37
-	// The OSS version of sidekiq could lose jobs, so it is ok if we lose some too
-	// before jobs are moved to work-compatible format.
+	// This improves OSS version of sidekiq and will not lose sidekiq jobs.
 	dequeueScript := redis.NewScript(`
 	local sidekiq_ns = ARGV[1]
 	local sidekiq_queue = ARGV[2]
@@ -100,19 +100,36 @@ func NewQueue(client redis.UniversalClient) Queue {
 		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
 	end
 
-	local ret = {}
-
+	local index = 1
 	while true do
-		local jobm = redis.call("rpop", queue_key)
-		if jobm == false then
+		local jobms = redis.call("lrange", queue_key, -index, -index)
+		if table.getn(jobms) > 0 then
+			local jobm = jobms[1]
+			local invisible_key = table.concat({queue_key, "invisible", jobm}, ":")
+			if redis.call("set", invisible_key, 1, "ex", 30, "nx") then
+				return jobm
+			end
+		else
 			break
 		end
-		table.insert(ret, jobm)
+		index = index + 1
 	end
-	if table.getn(ret) == 0 then
-		return nil
+	return nil
+	`)
+
+	ackScript := redis.NewScript(`
+	local sidekiq_ns = ARGV[1]
+	local sidekiq_queue = ARGV[2]
+	local jobm = ARGV[3]
+
+	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
+	if sidekiq_ns ~= "" then
+		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
 	end
-	return ret
+	local invisible_key = table.concat({queue_key, "invisible", jobm}, ":")
+
+	redis.call("lrem", queue_key, -1, jobm)
+	return redis.call("del", invisible_key)
 	`)
 
 	scheduleScript := redis.NewScript(`
@@ -149,6 +166,7 @@ func NewQueue(client redis.UniversalClient) Queue {
 		enqueueScript:   enqueueScript,
 		enqueueInScript: enqueueInScript,
 		dequeueScript:   dequeueScript,
+		ackScript:       ackScript,
 		scheduleScript:  scheduleScript,
 	}
 }
@@ -202,38 +220,44 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	if err != nil {
 		return err
 	}
-	res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
-		opt.SidekiqNamespace,
-		opt.SidekiqQueue,
-	).Result()
-	if err != nil {
-		if err != redis.Nil {
+	for {
+		res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
+			opt.SidekiqNamespace,
+			opt.SidekiqQueue,
+		).Result()
+		if err != nil {
+			if err == redis.Nil {
+				return nil
+			}
 			return err
 		}
-	} else {
-		jobm := res.([]interface{})
-		for _, iface := range jobm {
-			var sqJob sidekiqJob
-			err := json.NewDecoder(strings.NewReader(iface.(string))).Decode(&sqJob)
-			if err != nil {
-				return err
-			}
-			err = sqJob.Validate()
-			if err != nil {
-				return err
-			}
-			job, err := newJob(&sqJob)
-			if err != nil {
-				return err
-			}
-			err = q.RedisQueue.Enqueue(job, &work.EnqueueOptions{
-				Namespace: opt.Namespace,
-				QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
-			})
-			if err != nil {
-				return err
-			}
+		var sqJob sidekiqJob
+		err = json.NewDecoder(strings.NewReader(res.(string))).Decode(&sqJob)
+		if err != nil {
+			return err
+		}
+		err = sqJob.Validate()
+		if err != nil {
+			return err
+		}
+		job, err := newJob(&sqJob)
+		if err != nil {
+			return err
+		}
+		err = q.RedisQueue.Enqueue(job, &work.EnqueueOptions{
+			Namespace: opt.Namespace,
+			QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
+		})
+		if err != nil {
+			return err
+		}
+		err = q.ackScript.Run(context.Background(), q.client, nil,
+			opt.SidekiqNamespace,
+			opt.SidekiqQueue,
+			res.(string),
+		).Err()
+		if err != nil {
+			return err
 		}
 	}
-	return nil
 }
