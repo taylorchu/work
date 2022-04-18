@@ -209,7 +209,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	pull := func() error {
 		lock := &redislock.Lock{
 			Client:       q.client,
-			Key:          fmt.Sprintf("%s:sidekiq-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue),
+			Key:          fmt.Sprintf("%s:sidekiq-queue-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue),
 			ID:           uuid.NewString(),
 			At:           time.Now(),
 			ExpireInSec:  30,
