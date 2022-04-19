@@ -220,7 +220,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 			return err
 		}
 		if !acquired {
-			return nil
+			return redis.Nil
 		}
 		defer lock.Release()
 
@@ -265,7 +265,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	for {
 		err := pull()
 		if err != nil {
-			if err == redis.Nil {
+			if errors.Is(err, redis.Nil) {
 				return nil
 			}
 			return err
