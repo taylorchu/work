@@ -2,7 +2,7 @@ package work
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -16,6 +16,7 @@ type redisQueue struct {
 	dequeueScript *redis.Script
 	ackScript     *redis.Script
 	findScript    *redis.Script
+	metricScript  *redis.Script
 }
 
 // RedisQueue implements Queue with other additional capabilities
@@ -131,12 +132,37 @@ func NewRedisQueue(client redis.UniversalClient) RedisQueue {
 	return ret
 	`)
 
+	metricScript := redis.NewScript(`
+	local ns = ARGV[1]
+	local queue_id = ARGV[2]
+	local at = tonumber(ARGV[3])
+	local queue_key = table.concat({ns, "queue", queue_id}, ":")
+
+	local ready_total = redis.call("zcount", queue_key, "-inf", at)
+	local scheduled_total = redis.call("zcount", queue_key, string.format("(%d", at), "+inf")
+
+	local job_key_scores = redis.call("zrangebyscore", queue_key, "-inf", at, "limit", 0, 1, "withscores")
+	local latency = 0
+	if table.getn(job_key_scores) == 2 then
+		latency = at - job_key_scores[2] + 1
+	end
+
+	return cjson.encode({
+		Namespace = ns,
+		QueueID = queue_id,
+		ReadyTotal = ready_total,
+		ScheduledTotal = scheduled_total,
+		Latency = latency,
+	})
+	`)
+
 	return &redisQueue{
 		client:        client,
 		enqueueScript: enqueueScript,
 		dequeueScript: dequeueScript,
 		ackScript:     ackScript,
 		findScript:    findScript,
+		metricScript:  metricScript,
 	}
 }
 
@@ -265,33 +291,19 @@ func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, e
 	if err != nil {
 		return nil, err
 	}
-	queueKey := fmt.Sprintf("%s:queue:%s", opt.Namespace, opt.QueueID)
-	now := fmt.Sprint(opt.At.Unix())
-	readyTotal, err := q.client.ZCount(context.Background(), queueKey, "-inf", now).Result()
+	res, err := q.metricScript.Run(context.Background(), q.client, nil,
+		opt.Namespace,
+		opt.QueueID,
+		opt.At.Unix(),
+	).Result()
 	if err != nil {
 		return nil, err
 	}
-	scheduledTotal, err := q.client.ZCount(context.Background(), queueKey, "("+now, "+inf").Result()
+	var m QueueMetrics
+	err = json.NewDecoder(strings.NewReader(res.(string))).Decode(&m)
 	if err != nil {
 		return nil, err
 	}
-	z, err := q.client.ZRangeByScoreWithScores(context.Background(), queueKey, &redis.ZRangeBy{
-		Min:   "-inf",
-		Max:   now,
-		Count: 1,
-	}).Result()
-	if err != nil {
-		return nil, err
-	}
-	var latency time.Duration
-	if len(z) > 0 {
-		latency = time.Since(time.Unix(int64(z[0].Score), 0))
-	}
-	return &QueueMetrics{
-		Namespace:      opt.Namespace,
-		QueueID:        opt.QueueID,
-		ReadyTotal:     readyTotal,
-		ScheduledTotal: scheduledTotal,
-		Latency:        latency,
-	}, nil
+	m.Latency = time.Duration(m.Latency) * time.Second
+	return &m, nil
 }
