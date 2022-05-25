@@ -142,18 +142,16 @@ func NewRedisQueue(client redis.UniversalClient) RedisQueue {
 	local ready_total = redis.call("zcount", queue_key, "-inf", at)
 	local scheduled_total = redis.call("zcount", queue_key, string.format("(%d", at), "+inf")
 
-	local job_key_scores = redis.call("zrangebyscore", queue_key, "-inf", at, "limit", 0, 1, "withscores")
-	local latency = 0
-	if table.getn(job_key_scores) == 2 then
-		latency = at - job_key_scores[2] + 1
+	local job_pairs = redis.call("zrangebyscore", queue_key, "-inf", at, "limit", 0, 1, "withscores")
+	local first_job_at = 0
+	if table.getn(job_pairs) == 2 then
+		first_job_at = tonumber(job_pairs[2])
 	end
 
 	return cjson.encode({
-		Namespace = ns,
-		QueueID = queue_id,
 		ReadyTotal = ready_total,
 		ScheduledTotal = scheduled_total,
-		Latency = latency,
+		FirstJobAt = first_job_at,
 	})
 	`)
 
@@ -300,11 +298,24 @@ func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, e
 	if err != nil {
 		return nil, err
 	}
-	var m QueueMetrics
+	var m struct {
+		ReadyTotal     int64
+		ScheduledTotal int64
+		FirstJobAt     int64
+	}
 	err = json.NewDecoder(strings.NewReader(res.(string))).Decode(&m)
 	if err != nil {
 		return nil, err
 	}
-	m.Latency = time.Duration(m.Latency) * time.Second
-	return &m, nil
+	var latency time.Duration
+	if m.FirstJobAt > 0 {
+		latency = time.Since(time.Unix(m.FirstJobAt, 0))
+	}
+	return &QueueMetrics{
+		Namespace:      opt.Namespace,
+		QueueID:        opt.QueueID,
+		ReadyTotal:     m.ReadyTotal,
+		ScheduledTotal: m.ScheduledTotal,
+		Latency:        latency,
+	}, nil
 }
