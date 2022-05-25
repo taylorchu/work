@@ -2,7 +2,8 @@ package work
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ type redisQueue struct {
 	dequeueScript *redis.Script
 	ackScript     *redis.Script
 	findScript    *redis.Script
+	metricScript  *redis.Script
 }
 
 // RedisQueue implements Queue with other additional capabilities
@@ -131,12 +133,35 @@ func NewRedisQueue(client redis.UniversalClient) RedisQueue {
 	return ret
 	`)
 
+	metricScript := redis.NewScript(`
+	local ns = ARGV[1]
+	local queue_id = ARGV[2]
+	local at = tonumber(ARGV[3])
+	local queue_key = table.concat({ns, "queue", queue_id}, ":")
+
+	local ready_total = redis.call("zcount", queue_key, "-inf", at)
+	local scheduled_total = redis.call("zcount", queue_key, string.format("(%d", at), "+inf")
+
+	local job_pairs = redis.call("zrangebyscore", queue_key, "-inf", at, "limit", 0, 1, "withscores")
+	local first_job_at = 0
+	if table.getn(job_pairs) == 2 then
+		first_job_at = tonumber(job_pairs[2])
+	end
+
+	return cjson.encode({
+		ReadyTotal = ready_total,
+		ScheduledTotal = scheduled_total,
+		FirstJobAt = first_job_at,
+	})
+	`)
+
 	return &redisQueue{
 		client:        client,
 		enqueueScript: enqueueScript,
 		dequeueScript: dequeueScript,
 		ackScript:     ackScript,
 		findScript:    findScript,
+		metricScript:  metricScript,
 	}
 }
 
@@ -188,7 +213,7 @@ func (q *redisQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, erro
 		count,
 	).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, ErrEmptyQueue
 		}
 		return nil, err
@@ -265,33 +290,32 @@ func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, e
 	if err != nil {
 		return nil, err
 	}
-	queueKey := fmt.Sprintf("%s:queue:%s", opt.Namespace, opt.QueueID)
-	now := fmt.Sprint(opt.At.Unix())
-	readyTotal, err := q.client.ZCount(context.Background(), queueKey, "-inf", now).Result()
+	res, err := q.metricScript.Run(context.Background(), q.client, nil,
+		opt.Namespace,
+		opt.QueueID,
+		opt.At.Unix(),
+	).Result()
 	if err != nil {
 		return nil, err
 	}
-	scheduledTotal, err := q.client.ZCount(context.Background(), queueKey, "("+now, "+inf").Result()
-	if err != nil {
-		return nil, err
+	var m struct {
+		ReadyTotal     int64
+		ScheduledTotal int64
+		FirstJobAt     int64
 	}
-	z, err := q.client.ZRangeByScoreWithScores(context.Background(), queueKey, &redis.ZRangeBy{
-		Min:   "-inf",
-		Max:   now,
-		Count: 1,
-	}).Result()
+	err = json.NewDecoder(strings.NewReader(res.(string))).Decode(&m)
 	if err != nil {
 		return nil, err
 	}
 	var latency time.Duration
-	if len(z) > 0 {
-		latency = time.Since(time.Unix(int64(z[0].Score), 0))
+	if m.FirstJobAt > 0 {
+		latency = time.Since(time.Unix(m.FirstJobAt, 0))
 	}
 	return &QueueMetrics{
 		Namespace:      opt.Namespace,
 		QueueID:        opt.QueueID,
-		ReadyTotal:     readyTotal,
-		ScheduledTotal: scheduledTotal,
+		ReadyTotal:     m.ReadyTotal,
+		ScheduledTotal: m.ScheduledTotal,
 		Latency:        latency,
 	}, nil
 }
