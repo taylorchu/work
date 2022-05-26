@@ -79,7 +79,7 @@ workflows:
             parameters:
               go-image:
                 - cimg/go:1.17
-                - cimg/go:1.16
+                - cimg/go:1.18
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
@@ -89,7 +89,7 @@ workflows:
             parameters:
               go-image:
                 - cimg/go:1.17
-                - cimg/go:1.16
+                - cimg/go:1.18
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
