@@ -1,13 +1,13 @@
 module github.com/taylorchu/work/bench
 
-go 1.17
+go 1.18
 
 require (
-	github.com/go-redis/redis/v8 v8.11.4
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gocraft/work v0.5.2-0.20180912175354-c85b71e20062
-	github.com/gomodule/redigo v1.8.5
-	github.com/stretchr/testify v1.7.0
-	github.com/taylorchu/work v0.2.4-0.20220210165902-787ae01fa4ea
+	github.com/gomodule/redigo v1.8.8
+	github.com/stretchr/testify v1.7.1
+	github.com/taylorchu/work v0.2.7
 )
 
 require (
