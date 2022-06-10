@@ -186,7 +186,8 @@ type PullOptions struct {
 	// work-compatible namespace
 	Namespace string
 	// optional work-compatible queue
-	// This allows moving jobs to another redis instance.
+	// This allows moving jobs to another redis instance. Without this, these jobs are moved
+	// within the same sidekiq redis instance.
 	Queue work.Queue
 	// sidekiq-compatible namespace
 	// Only used by https://github.com/resque/redis-namespace. By default, it is empty.
