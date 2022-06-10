@@ -183,10 +183,16 @@ type JobPuller interface {
 
 // PullOptions specifies how a job is pulled from sidekiq-compatible queue.
 type PullOptions struct {
+	// work-compatible namespace
 	Namespace string
-	// Used by https://github.com/resque/redis-namespace. By default, it is empty.
+	// optional work-compatible queue
+	// This allows moving jobs to another redis instance.
+	Queue work.Queue
+	// sidekiq-compatible namespace
+	// Only used by https://github.com/resque/redis-namespace. By default, it is empty.
 	SidekiqNamespace string
-	SidekiqQueue     string
+	// sidekiq-compatible queue like `default`.
+	SidekiqQueue string
 }
 
 // Validate validates PullOptions.
@@ -244,7 +250,11 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		if err != nil {
 			return err
 		}
-		err = q.RedisQueue.Enqueue(job, &work.EnqueueOptions{
+		queue := opt.Queue
+		if queue == nil {
+			queue = q.RedisQueue
+		}
+		err = queue.Enqueue(job, &work.EnqueueOptions{
 			Namespace: opt.Namespace,
 			QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
 		})
