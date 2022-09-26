@@ -493,8 +493,8 @@ func TestRetry(t *testing.T) {
 	}
 
 	t.Log("delay", delays)
-	for i := 1; i < len(delays); i++ {
-		require.True(t, delays[i] > delays[i-1])
+	for i := 2; i < len(delays); i += 2 {
+		require.True(t, delays[i] > delays[i-2])
 		require.True(t, delays[i] > 1)
 	}
 }
