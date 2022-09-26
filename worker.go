@@ -352,10 +352,10 @@ var (
 func defaultBackoff() BackoffFunc {
 	return func(job *Job, opt *DequeueOptions) time.Duration {
 		b := backoff.NewExponentialBackOff()
-		b.InitialInterval = 2 * time.Second
+		b.InitialInterval = time.Second
 		b.RandomizationFactor = 0.2
 		b.Multiplier = 1.6
-		b.MaxInterval = 24 * time.Hour
+		b.MaxInterval = time.Hour
 		b.MaxElapsedTime = 0
 		b.Reset()
 
