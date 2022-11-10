@@ -132,6 +132,18 @@ func (opts *ServerOptions) createJob(rw http.ResponseWriter, r *http.Request) {
 			job.ID = enqueueRequest.ID
 		}
 		job.Payload = enqueueRequest.Payload
+		if finder, ok := opts.Queue.(work.BulkJobFinder); ok {
+			// best effort to check for duplicates
+			jobs, err := finder.BulkFind([]string{job.ID}, &work.FindOptions{
+				Namespace: namespace,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if len(jobs) == 1 && jobs[0] != nil {
+				return jobs[0], nil
+			}
+		}
 		err = opts.Queue.Enqueue(job, &work.EnqueueOptions{
 			Namespace: namespace,
 			QueueID:   queueID,

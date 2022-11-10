@@ -188,10 +188,7 @@ type PullOptions struct {
 	// optional work-compatible queue
 	// This allows moving jobs to another redis instance. Without this, these jobs are moved
 	// within the same sidekiq redis instance.
-	Queue interface {
-		work.Queue
-		work.BulkJobFinder
-	}
+	Queue work.Queue
 	// sidekiq-compatible namespace
 	// Only used by https://github.com/resque/redis-namespace. By default, it is empty.
 	SidekiqNamespace string
@@ -258,13 +255,18 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		if queue == nil {
 			queue = q.RedisQueue
 		}
-		jobs, err := queue.BulkFind([]string{job.ID}, &work.FindOptions{
-			Namespace: opt.Namespace,
-		})
-		if err != nil {
-			return err
+		var found bool
+		if finder, ok := queue.(work.BulkJobFinder); ok {
+			// best effort to check for duplicates
+			jobs, err := finder.BulkFind([]string{job.ID}, &work.FindOptions{
+				Namespace: opt.Namespace,
+			})
+			if err != nil {
+				return err
+			}
+			found = len(jobs) == 1 && jobs[0] != nil
 		}
-		if len(jobs) == 1 && jobs[0] == nil {
+		if !found {
 			err := queue.Enqueue(job, &work.EnqueueOptions{
 				Namespace: opt.Namespace,
 				QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
