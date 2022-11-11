@@ -255,12 +255,25 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		if queue == nil {
 			queue = q.RedisQueue
 		}
-		err = queue.Enqueue(job, &work.EnqueueOptions{
-			Namespace: opt.Namespace,
-			QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
-		})
-		if err != nil {
-			return err
+		var found bool
+		if finder, ok := queue.(work.BulkJobFinder); ok {
+			// best effort to check for duplicates
+			jobs, err := finder.BulkFind([]string{job.ID}, &work.FindOptions{
+				Namespace: opt.Namespace,
+			})
+			if err != nil {
+				return err
+			}
+			found = len(jobs) == 1 && jobs[0] != nil
+		}
+		if !found {
+			err := queue.Enqueue(job, &work.EnqueueOptions{
+				Namespace: opt.Namespace,
+				QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
+			})
+			if err != nil {
+				return err
+			}
 		}
 		err = q.ackScript.Run(context.Background(), q.client, nil,
 			opt.SidekiqNamespace,

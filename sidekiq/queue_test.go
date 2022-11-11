@@ -540,4 +540,39 @@ func TestSidekiqQueueEnqueueDuplicated(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, z, 1)
 	require.EqualValues(t, job.EnqueuedAt.Unix(), z[0].Score)
+
+	// pull again with same job id
+	l, err := client.LRange(context.Background(), "{ns1}:queue:low", 0, -1).Result()
+	require.NoError(t, err)
+	require.Len(t, l, 0)
+
+	err = q.schedule("{ns1}", now)
+	require.NoError(t, err)
+
+	l, err = client.LRange(context.Background(), "{ns1}:queue:low", 0, -1).Result()
+	require.NoError(t, err)
+	require.Len(t, l, 1)
+
+	err = q.Pull(&PullOptions{
+		Namespace:        "{ns1}",
+		SidekiqNamespace: "{ns1}",
+		SidekiqQueue:     "low",
+	})
+	require.NoError(t, err)
+
+	l, err = client.LRange(context.Background(), "{ns1}:queue:low", 0, -1).Result()
+	require.NoError(t, err)
+	require.Len(t, l, 0)
+
+	z, err = client.ZRangeByScoreWithScores(
+		context.Background(),
+		"{ns1}:queue:low/q1",
+		&redis.ZRangeBy{
+			Min: "-inf",
+			Max: "+inf",
+		}).Result()
+	require.NoError(t, err)
+	require.Len(t, z, 1)
+	require.Equal(t, jobKey, z[0].Member)
+	require.EqualValues(t, job.EnqueuedAt.Unix()+60, z[0].Score)
 }
