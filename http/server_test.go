@@ -126,7 +126,7 @@ func TestServer(t *testing.T) {
 				"delay": "10s"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[T0-9:-]+\",\"UpdatedAt\":\"[T0-9:-]+\",\"EnqueuedAt\":\"[T0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
@@ -141,7 +141,7 @@ func TestServer(t *testing.T) {
 				"payload": "payload1"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[T0-9:-]+\",\"UpdatedAt\":\"[T0-9:-]+\",\"EnqueuedAt\":\"[T0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
@@ -157,7 +157,7 @@ func TestServer(t *testing.T) {
 				"payload": "payload1"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[T0-9:-]+\",\"UpdatedAt\":\"[T0-9:-]+\",\"EnqueuedAt\":\"[T0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			// same job id
@@ -168,7 +168,7 @@ func TestServer(t *testing.T) {
 				"payload": "payload2"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[T0-9:-]+\",\"UpdatedAt\":\"[T0-9:-]+\",\"EnqueuedAt\":\"[T0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
@@ -180,7 +180,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "GET",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"status\":\"ready\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[T0-9:-]+\",\"UpdatedAt\":\"[T0-9:-]+\",\"EnqueuedAt\":\"[T0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody:  "{\"namespace\":\"{ns1}\",\"status\":\"ready\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "DELETE",
@@ -192,7 +192,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "DELETE",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=id1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[T0-9:-]+\",\"UpdatedAt\":\"[T0-9:-]+\",\"EnqueuedAt\":\"[T0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
