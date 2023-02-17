@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 // NewClient creates a redis client for testing.
