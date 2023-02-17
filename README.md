@@ -13,10 +13,10 @@ Please see `cmd/` for enqueuer and worker demo.
   - redis is still the default, but the new design allows custom queue implementation.
 - [x] simplify the keyspace design of redis queue backend
   - The new design uses 1 redis hash per job, and 1 redis sorted set for queue.
-  - [Interesting read](https://kirshatrov.com/2018/07/20/redis-job-queue/)
+  - [Interesting read](https://kirshatrov.com/posts/redis-job-queue)
 - [x] modular
   - The core only catches panics, retries on failure, and waits if a queue is empty.
-  - All other [functionalities](https://kirshatrov.com/2019/01/03/state-of-background-jobs/)
+  - All other [functionalities](https://kirshatrov.com/posts/state-of-background-jobs)
     are either removed or moved to separate middlewares.
 - [x] support binary payload/args with message pack.
 - [x] replace built-in UI with prometheus metrics (use grafana if you want dashboard).
