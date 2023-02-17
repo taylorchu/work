@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/gocraft/work"
 	redigo "github.com/gomodule/redigo/redis"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	work2 "github.com/taylorchu/work"
 	"github.com/taylorchu/work/redistest"
