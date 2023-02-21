@@ -7,11 +7,11 @@ require (
 	github.com/gomodule/redigo v1.8.8
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/stretchr/testify v1.8.1
-	github.com/taylorchu/work v0.2.12-0.20230217232825-8f40a7dc1e96
+	github.com/taylorchu/work v0.2.12-0.20230221190148-bb94a56be4ff
 )
 
 require (
-	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
