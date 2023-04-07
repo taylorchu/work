@@ -27,6 +27,7 @@ type sidekiqJob struct {
 
 // sidekiq job validation errors
 var (
+	ErrJobEmptyQueue = errors.New("sidekiq: empty job queue")
 	ErrJobEmptyClass = errors.New("sidekiq: empty job class")
 	ErrJobEmptyID    = errors.New("sidekiq: empty job id")
 	ErrJobCreatedAt  = errors.New("sidekiq: job created_at should be > 0")
@@ -35,6 +36,9 @@ var (
 )
 
 func (j *sidekiqJob) Validate() error {
+	if j.Queue == "" {
+		return ErrJobEmptyQueue
+	}
 	if j.Class == "" {
 		return ErrJobEmptyClass
 	}
