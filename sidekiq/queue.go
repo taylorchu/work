@@ -213,24 +213,8 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	if err != nil {
 		return err
 	}
-	pull := func() error {
-		lock := &redislock.Lock{
-			Client:       q.client,
-			Key:          fmt.Sprintf("%s:sidekiq-queue-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue),
-			ID:           uuid.NewString(),
-			At:           time.Now(),
-			ExpireInSec:  30,
-			MaxAcquirers: 1,
-		}
-		acquired, err := lock.Acquire()
-		if err != nil {
-			return err
-		}
-		if !acquired {
-			return redis.Nil
-		}
-		defer lock.Release()
 
+	pull := func() error {
 		res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
 			opt.SidekiqNamespace,
 			opt.SidekiqQueue,
@@ -286,7 +270,32 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		return nil
 	}
 
+	const timeoutSec = 30
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutSec*time.Second)
+	defer cancel()
+	lock := &redislock.Lock{
+		Client:       q.client,
+		Key:          fmt.Sprintf("%s:sidekiq-queue-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue),
+		ID:           uuid.NewString(),
+		At:           time.Now(),
+		ExpireInSec:  timeoutSec,
+		MaxAcquirers: 1,
+	}
+	acquired, err := lock.Acquire()
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return nil
+	}
+	defer lock.Release()
+
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		err := pull()
 		if err != nil {
 			if errors.Is(err, redis.Nil) {
