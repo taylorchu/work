@@ -231,7 +231,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	if err != nil {
 		return err
 	}
-	queueNamespace := "sidekiq-queue-pull"
+	queueNamespace := "{sidekiq-queue-pull}"
 	queueID := uuid.NewString()
 	err = q.dequeueRenameScript.Run(context.Background(), q.client, nil,
 		opt.SidekiqNamespace,
