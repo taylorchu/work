@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/taylorchu/work"
 	"github.com/taylorchu/work/redislock"
 )
@@ -213,24 +213,8 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	if err != nil {
 		return err
 	}
-	pull := func() error {
-		lock := &redislock.Lock{
-			Client:       q.client,
-			Key:          fmt.Sprintf("%s:sidekiq-queue-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue),
-			ID:           uuid.NewString(),
-			At:           time.Now(),
-			ExpireInSec:  30,
-			MaxAcquirers: 1,
-		}
-		acquired, err := lock.Acquire()
-		if err != nil {
-			return err
-		}
-		if !acquired {
-			return redis.Nil
-		}
-		defer lock.Release()
 
+	pull := func() error {
 		res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
 			opt.SidekiqNamespace,
 			opt.SidekiqQueue,
@@ -255,12 +239,25 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		if queue == nil {
 			queue = q.RedisQueue
 		}
-		err = queue.Enqueue(job, &work.EnqueueOptions{
-			Namespace: opt.Namespace,
-			QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
-		})
-		if err != nil {
-			return err
+		var found bool
+		if finder, ok := queue.(work.BulkJobFinder); ok {
+			// best effort to check for duplicates
+			jobs, err := finder.BulkFind([]string{job.ID}, &work.FindOptions{
+				Namespace: opt.Namespace,
+			})
+			if err != nil {
+				return err
+			}
+			found = len(jobs) == 1 && jobs[0] != nil
+		}
+		if !found {
+			err := queue.Enqueue(job, &work.EnqueueOptions{
+				Namespace: opt.Namespace,
+				QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
+			})
+			if err != nil {
+				return err
+			}
 		}
 		err = q.ackScript.Run(context.Background(), q.client, nil,
 			opt.SidekiqNamespace,
@@ -273,7 +270,32 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		return nil
 	}
 
+	const timeoutSec = 30
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutSec*time.Second)
+	defer cancel()
+	lock := &redislock.Lock{
+		Client:       q.client,
+		Key:          fmt.Sprintf("%s:sidekiq-queue-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue),
+		ID:           uuid.NewString(),
+		At:           time.Now(),
+		ExpireInSec:  timeoutSec,
+		MaxAcquirers: 1,
+	}
+	acquired, err := lock.Acquire()
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return nil
+	}
+	defer lock.Release()
+
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
 		err := pull()
 		if err != nil {
 			if errors.Is(err, redis.Nil) {

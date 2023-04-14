@@ -78,22 +78,22 @@ workflows:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.17
-                - cimg/go:1.18
                 - cimg/go:1.19
+                - cimg/go:1.20
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
+                - redis:7-alpine
                 - eqalpha/keydb
       - redis-cluster:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.17
-                - cimg/go:1.18
                 - cimg/go:1.19
+                - cimg/go:1.20
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
+                - redis:7-alpine
                 - eqalpha/keydb
       - fossa

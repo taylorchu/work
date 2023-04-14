@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"strings"
@@ -125,6 +126,7 @@ func TestServer(t *testing.T) {
 				"delay": "10s"
 			}`,
 			respCode: 200,
+			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
@@ -139,6 +141,7 @@ func TestServer(t *testing.T) {
 				"payload": "payload1"
 			}`,
 			respCode: 200,
+			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
@@ -154,6 +157,18 @@ func TestServer(t *testing.T) {
 				"payload": "payload1"
 			}`,
 			respCode: 200,
+			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+		},
+		{
+			// same job id
+			reqMethod: "POST",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
+			reqBody: `{
+				"id": "id1",
+				"payload": "payload2"
+			}`,
+			respCode: 200,
+			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
@@ -165,6 +180,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "GET",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
 			respCode:  200,
+			respBody:  "{\"namespace\":\"{ns1}\",\"status\":\"ready\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "DELETE",
@@ -176,6 +192,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "DELETE",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=id1",
 			respCode:  200,
+			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
@@ -191,11 +208,7 @@ func TestServer(t *testing.T) {
 		req := httptest.NewRequest(test.reqMethod, test.reqURL, reqBody)
 		w := httptest.NewRecorder()
 		srv.ServeHTTP(w, req)
-		if !(test.respBody == "" && test.respCode == 200) {
-			require.Regexp(t, test.respBody, w.Body.String())
-		} else {
-			t.Logf("response: %q", w.Body.String())
-		}
+		require.Regexp(t, fmt.Sprintf("^%s\n?$", test.respBody), w.Body.String())
 		require.Equal(t, test.respCode, w.Code)
 	}
 }
