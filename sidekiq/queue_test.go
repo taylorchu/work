@@ -7,11 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
-	"github.com/taylorchu/work/redislock"
 	"github.com/taylorchu/work/redistest"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -272,47 +270,6 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Equal(t, work.ErrEmptyQueue, err)
-}
-
-func TestSidekiqQueueDequeueLocked(t *testing.T) {
-	client := redistest.NewClient()
-	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
-	q := NewQueue(client)
-
-	job := work.NewJob()
-	err := job.MarshalJSONPayload([]int{1, 2, 3})
-	require.NoError(t, err)
-
-	err = q.ExternalEnqueue(job, &work.EnqueueOptions{
-		Namespace: "{ns1}",
-		QueueID:   "low/q1",
-	})
-	require.NoError(t, err)
-
-	now := job.EnqueuedAt.Add(123 * time.Second)
-
-	err = q.schedule("{ns1}", now)
-	require.NoError(t, err)
-
-	lock := &redislock.Lock{
-		Client:       client,
-		Key:          "{ns1}:sidekiq-queue-pull:low",
-		ID:           uuid.NewString(),
-		At:           time.Now(),
-		ExpireInSec:  30,
-		MaxAcquirers: 1,
-	}
-	acquired, err := lock.Acquire()
-	require.NoError(t, err)
-	require.True(t, acquired)
-
-	err = q.Pull(&PullOptions{
-		Namespace:        "{ns1}",
-		SidekiqNamespace: "{ns1}",
-		SidekiqQueue:     "low",
-	})
-	require.NoError(t, err)
 }
 
 func TestSidekiqQueueDequeueDeletedJob(t *testing.T) {

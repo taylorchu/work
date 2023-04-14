@@ -11,17 +11,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/taylorchu/work"
-	"github.com/taylorchu/work/redislock"
 )
 
 type sidekiqQueue struct {
 	work.RedisQueue
-	client          redis.UniversalClient
-	enqueueScript   *redis.Script
-	enqueueInScript *redis.Script
-	dequeueScript   *redis.Script
-	ackScript       *redis.Script
-	scheduleScript  *redis.Script
+	client              redis.UniversalClient
+	enqueueScript       *redis.Script
+	enqueueInScript     *redis.Script
+	dequeueScript       *redis.Script
+	ackScript           *redis.Script
+	dequeueRenameScript *redis.Script
+	dequeueCleanScript  *redis.Script
+	scheduleScript      *redis.Script
 }
 
 // sidekiq queue id validation errors
@@ -94,28 +95,43 @@ func NewQueue(client redis.UniversalClient) Queue {
 	// https://github.com/mperham/sidekiq/blob/455e9d56f46f0299eaf3b761596207e15f906a39/lib/sidekiq/fetch.rb#L37
 	// This improves OSS version of sidekiq and will not lose sidekiq jobs.
 	dequeueScript := redis.NewScript(`
-	local sidekiq_ns = ARGV[1]
-	local sidekiq_queue = ARGV[2]
+	local queue_ns = ARGV[1]
+	local queue_id = ARGV[2]
 
-	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
-	if sidekiq_ns ~= "" then
-		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
-	end
-
+	local queue_key = table.concat({queue_ns, queue_id}, ":")
 	return redis.call("lindex", queue_key, -1)
 	`)
 
 	ackScript := redis.NewScript(`
+	local queue_ns = ARGV[1]
+	local queue_id = ARGV[2]
+	local jobm = ARGV[3]
+
+	local queue_key = table.concat({queue_ns, queue_id}, ":")
+	return redis.call("lrem", queue_key, -1, jobm)
+	`)
+
+	dequeueRenameScript := redis.NewScript(`
 	local sidekiq_ns = ARGV[1]
 	local sidekiq_queue = ARGV[2]
-	local jobm = ARGV[3]
+	local rename_ns = ARGV[3]
+	local rename_id = ARGV[4]
 
 	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
 	if sidekiq_ns ~= "" then
 		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
 	end
+	local rename_key = table.concat({rename_ns, rename_id}, ":")
 
-	return redis.call("lrem", queue_key, -1, jobm)
+	return redis.call("renamenx", queue_key, rename_key)
+	`)
+
+	dequeueCleanScript := redis.NewScript(`
+	local queue_ns = ARGV[1]
+	local queue_id = ARGV[2]
+
+	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
+	return redis.call("del", queue_key)
 	`)
 
 	scheduleScript := redis.NewScript(`
@@ -147,13 +163,15 @@ func NewQueue(client redis.UniversalClient) Queue {
 	`)
 
 	return &sidekiqQueue{
-		RedisQueue:      work.NewRedisQueue(client),
-		client:          client,
-		enqueueScript:   enqueueScript,
-		enqueueInScript: enqueueInScript,
-		dequeueScript:   dequeueScript,
-		ackScript:       ackScript,
-		scheduleScript:  scheduleScript,
+		RedisQueue:          work.NewRedisQueue(client),
+		client:              client,
+		enqueueScript:       enqueueScript,
+		enqueueInScript:     enqueueInScript,
+		dequeueScript:       dequeueScript,
+		ackScript:           ackScript,
+		dequeueRenameScript: dequeueRenameScript,
+		dequeueCleanScript:  dequeueCleanScript,
+		scheduleScript:      scheduleScript,
 	}
 }
 
@@ -213,11 +231,28 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	if err != nil {
 		return err
 	}
+	queueNamespace := "sidekiq-queue-pull"
+	queueID := uuid.NewString()
+	err = q.dequeueRenameScript.Run(context.Background(), q.client, nil,
+		opt.SidekiqNamespace,
+		opt.SidekiqQueue,
+		queueNamespace,
+		queueID,
+	).Err()
+	if err != nil {
+		return err
+	}
+	defer func() error {
+		return q.dequeueCleanScript.Run(context.Background(), q.client, nil,
+			queueNamespace,
+			queueID,
+		).Err()
+	}()
 
 	pull := func() error {
 		res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
-			opt.SidekiqNamespace,
-			opt.SidekiqQueue,
+			queueNamespace,
+			queueID,
 		).Result()
 		if err != nil {
 			return err
@@ -260,8 +295,8 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 			}
 		}
 		err = q.ackScript.Run(context.Background(), q.client, nil,
-			opt.SidekiqNamespace,
-			opt.SidekiqQueue,
+			queueNamespace,
+			queueID,
 			res.(string),
 		).Err()
 		if err != nil {
@@ -270,32 +305,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		return nil
 	}
 
-	const timeoutSec = 30
-	ctx, cancel := context.WithTimeout(context.Background(), timeoutSec*time.Second)
-	defer cancel()
-	lock := &redislock.Lock{
-		Client:       q.client,
-		Key:          fmt.Sprintf("%s:sidekiq-queue-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue),
-		ID:           uuid.NewString(),
-		At:           time.Now(),
-		ExpireInSec:  timeoutSec,
-		MaxAcquirers: 1,
-	}
-	acquired, err := lock.Acquire()
-	if err != nil {
-		return err
-	}
-	if !acquired {
-		return nil
-	}
-	defer lock.Release()
-
 	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
 		err := pull()
 		if err != nil {
 			if errors.Is(err, redis.Nil) {
