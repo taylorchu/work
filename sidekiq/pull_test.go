@@ -17,6 +17,7 @@ func TestPullDequeueStartEmpty(t *testing.T) {
 
 	q := NewQueue(client)
 	now := time.Now()
+
 	err := q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
 		"{sidekiq}",
 		"default",
@@ -46,6 +47,7 @@ func TestPullDequeueStartNormal(t *testing.T) {
 
 	q := NewQueue(client)
 	now := time.Now()
+
 	err = q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
 		"{sidekiq}",
 		"default",
@@ -91,6 +93,7 @@ func TestPullDequeueStartAlreadyStarted(t *testing.T) {
 
 	q := NewQueue(client)
 	now := time.Now()
+
 	err = q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
 		"{sidekiq}",
 		"default",
@@ -144,6 +147,7 @@ func TestPullDequeueStartRecoveredNotExpired(t *testing.T) {
 
 	q := NewQueue(client)
 	now := time.Now()
+
 	err = q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
 		"{sidekiq}",
 		"default",
@@ -232,6 +236,7 @@ func TestPullDequeueStartRecoveredExpired(t *testing.T) {
 
 	q := NewQueue(client)
 	now := time.Now()
+
 	err = q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
 		"{sidekiq}",
 		"default",
@@ -311,7 +316,15 @@ func TestPullDequeueStop(t *testing.T) {
 
 	q := NewQueue(client)
 	now := time.Now()
-	err := q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
+
+	// no error without pullers key
+	err := q.(*sidekiqQueue).dequeueStopScript.Run(context.Background(), client, nil,
+		"{sidekiq}:sidekiq-queue-pull:default",
+		"123",
+	).Err()
+	require.NoError(t, err)
+
+	err = q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
 		"{sidekiq}",
 		"default",
 		"{sidekiq}:sidekiq-queue-pull:default",
@@ -333,6 +346,7 @@ func TestPullDequeueStop(t *testing.T) {
 	require.Equal(t, "123", z[0].Member)
 	require.EqualValues(t, now.Unix()+10, z[0].Score)
 
+	// remove existing entries
 	err = q.(*sidekiqQueue).dequeueStopScript.Run(context.Background(), client, nil,
 		"{sidekiq}:sidekiq-queue-pull:default",
 		"123",
@@ -357,7 +371,17 @@ func TestPullDequeueHeartbeat(t *testing.T) {
 
 	q := NewQueue(client)
 	now := time.Now()
-	err := q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
+
+	// no error without pullers key
+	err := q.(*sidekiqQueue).dequeueHeartbeatScript.Run(context.Background(), client, nil,
+		"{sidekiq}:sidekiq-queue-pull:default",
+		"123",
+		now.Unix(),
+		100,
+	).Err()
+	require.NoError(t, err)
+
+	err = q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, nil,
 		"{sidekiq}",
 		"default",
 		"{sidekiq}:sidekiq-queue-pull:default",
@@ -379,6 +403,7 @@ func TestPullDequeueHeartbeat(t *testing.T) {
 	require.Equal(t, "123", z[0].Member)
 	require.EqualValues(t, now.Unix()+10, z[0].Score)
 
+	// extend expiration
 	err = q.(*sidekiqQueue).dequeueHeartbeatScript.Run(context.Background(), client, nil,
 		"{sidekiq}:sidekiq-queue-pull:default",
 		"123",
@@ -399,6 +424,7 @@ func TestPullDequeueHeartbeat(t *testing.T) {
 	require.Equal(t, "123", z[0].Member)
 	require.EqualValues(t, now.Unix()+100, z[0].Score)
 
+	// test invalid entries
 	err = q.(*sidekiqQueue).dequeueHeartbeatScript.Run(context.Background(), client, nil,
 		"{sidekiq}:sidekiq-queue-pull:default",
 		"456",
