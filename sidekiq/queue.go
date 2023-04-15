@@ -15,14 +15,15 @@ import (
 
 type sidekiqQueue struct {
 	work.RedisQueue
-	client              redis.UniversalClient
-	enqueueScript       *redis.Script
-	enqueueInScript     *redis.Script
-	dequeueScript       *redis.Script
-	ackScript           *redis.Script
-	dequeueRenameScript *redis.Script
-	dequeueCleanScript  *redis.Script
-	scheduleScript      *redis.Script
+	client                 redis.UniversalClient
+	enqueueScript          *redis.Script
+	enqueueInScript        *redis.Script
+	dequeueScript          *redis.Script
+	ackScript              *redis.Script
+	dequeueStartScript     *redis.Script
+	dequeueStopScript      *redis.Script
+	dequeueHeartbeatScript *redis.Script
+	scheduleScript         *redis.Script
 }
 
 // sidekiq queue id validation errors
@@ -111,27 +112,55 @@ func NewQueue(client redis.UniversalClient) Queue {
 	return redis.call("lrem", queue_key, -1, jobm)
 	`)
 
-	dequeueRenameScript := redis.NewScript(`
+	dequeueStartScript := redis.NewScript(`
 	local sidekiq_ns = ARGV[1]
 	local sidekiq_queue = ARGV[2]
-	local rename_ns = ARGV[3]
-	local rename_id = ARGV[4]
+	local queue_ns = ARGV[3]
+	local queue_id = ARGV[4]
+	local at = tonumber(ARGV[5])
+	local expire_in_sec = tonumber(ARGV[6])
 
 	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
 	if sidekiq_ns ~= "" then
 		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
 	end
-	local rename_key = table.concat({rename_ns, rename_id}, ":")
-
-	return redis.call("renamenx", queue_key, rename_key)
+	local pullers_key = table.concat({queue_ns, "pullers"}, ":")
+	if redis.call("zadd", pullers_key, "nx", at + expire_in_sec, queue_id) == 0 then
+		return 0
+	end
+	local puller_queue_key = table.concat({queue_ns, queue_id}, ":")
+	local old_queue_ids = redis.call("zrangebyscore", pullers_key, "-inf", at, "limit", 0, 1)
+	for i, old_queue_id in pairs(old_queue_ids) do
+		local old_puller_queue_key = table.concat({queue_ns, old_queue_id}, ":")
+		redis.call("rename", old_puller_queue_key, puller_queue_key)
+		redis.call("zrem", pullers_key, old_queue_id)
+		return 1
+	end
+	redis.call("rename", queue_key, puller_queue_key)
+	return 1
 	`)
 
-	dequeueCleanScript := redis.NewScript(`
+	dequeueStopScript := redis.NewScript(`
 	local queue_ns = ARGV[1]
 	local queue_id = ARGV[2]
 
-	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
-	return redis.call("del", queue_key)
+	local puller_queue_key = table.concat({queue_ns, queue_id}, ":")
+	local pullers_key = table.concat({queue_ns, "pullers"}, ":")
+	if redis.call("llen", puller_queue_key) == 0 then
+		redis.call("del", puller_queue_key)
+		return redis.call("zrem", pullers_key, queue_id)
+	end
+	return 0
+	`)
+
+	dequeueHeartbeatScript := redis.NewScript(`
+	local queue_ns = ARGV[1]
+	local queue_id = ARGV[2]
+	local at = tonumber(ARGV[3])
+	local expire_in_sec = tonumber(ARGV[4])
+
+	local pullers_key = table.concat({queue_ns, "pullers"}, ":")
+	return redis.call("zadd", pullers_key, "xx", at + expire_in_sec, queue_id)
 	`)
 
 	scheduleScript := redis.NewScript(`
@@ -163,15 +192,16 @@ func NewQueue(client redis.UniversalClient) Queue {
 	`)
 
 	return &sidekiqQueue{
-		RedisQueue:          work.NewRedisQueue(client),
-		client:              client,
-		enqueueScript:       enqueueScript,
-		enqueueInScript:     enqueueInScript,
-		dequeueScript:       dequeueScript,
-		ackScript:           ackScript,
-		dequeueRenameScript: dequeueRenameScript,
-		dequeueCleanScript:  dequeueCleanScript,
-		scheduleScript:      scheduleScript,
+		RedisQueue:             work.NewRedisQueue(client),
+		client:                 client,
+		enqueueScript:          enqueueScript,
+		enqueueInScript:        enqueueInScript,
+		dequeueScript:          dequeueScript,
+		ackScript:              ackScript,
+		dequeueStartScript:     dequeueStartScript,
+		dequeueStopScript:      dequeueStopScript,
+		dequeueHeartbeatScript: dequeueHeartbeatScript,
+		scheduleScript:         scheduleScript,
 	}
 }
 
@@ -231,26 +261,52 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	if err != nil {
 		return err
 	}
-	queueNamespace := fmt.Sprintf("sidekiq-queue-pull:%s:%s", opt.SidekiqNamespace, opt.SidekiqQueue)
+	queueNamespace := fmt.Sprintf("%s:sidekiq-queue-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue)
 	queueID := uuid.NewString()
-	err = q.dequeueRenameScript.Run(context.Background(), q.client, nil,
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	expireInSec := 10
+	err = q.dequeueStartScript.Run(ctx, q.client, nil,
 		opt.SidekiqNamespace,
 		opt.SidekiqQueue,
 		queueNamespace,
 		queueID,
+		time.Now().Unix(),
+		expireInSec,
 	).Err()
 	if err != nil {
 		return err
 	}
 	defer func() error {
-		return q.dequeueCleanScript.Run(context.Background(), q.client, nil,
+		return q.dequeueStopScript.Run(ctx, q.client, nil,
 			queueNamespace,
 			queueID,
 		).Err()
 	}()
+	go func() {
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+				err := q.dequeueHeartbeatScript.Run(ctx, q.client, nil,
+					queueNamespace,
+					queueID,
+					time.Now().Unix(),
+					expireInSec,
+				).Err()
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
 
 	pull := func() error {
-		res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
+		res, err := q.dequeueScript.Run(ctx, q.client, nil,
 			queueNamespace,
 			queueID,
 		).Result()
@@ -294,7 +350,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 				return err
 			}
 		}
-		err = q.ackScript.Run(context.Background(), q.client, nil,
+		err = q.ackScript.Run(ctx, q.client, nil,
 			queueNamespace,
 			queueID,
 			res.(string),
