@@ -57,6 +57,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	defer cancel()
 
 	expireInSec := 10
+	refreshInSec := 2
 	err = q.dequeueStartScript.Run(ctx, q.client, nil,
 		opt.SidekiqNamespace,
 		opt.SidekiqQueue,
@@ -80,7 +81,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(time.Second):
+			case <-time.After(time.Duration(refreshInSec) * time.Second):
 				err := q.dequeueHeartbeatScript.Run(ctx, q.client, nil,
 					queueNamespace,
 					queueID,
