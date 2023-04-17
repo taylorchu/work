@@ -118,10 +118,6 @@ func NewQueue(client redis.UniversalClient) Queue {
 	local at = tonumber(ARGV[5])
 	local expire_in_sec = tonumber(ARGV[6])
 
-	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
-	if sidekiq_ns ~= "" then
-		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
-	end
 	local pullers_key = table.concat({queue_ns, "pullers"}, ":")
 	if redis.call("zadd", pullers_key, "nx", at + expire_in_sec, queue_id) == 0 then
 		return 0
@@ -135,6 +131,11 @@ func NewQueue(client redis.UniversalClient) Queue {
 		end
 		redis.call("zrem", pullers_key, old_queue_id)
 		return 1
+	end
+
+	local queue_key = table.concat({"queue", sidekiq_queue}, ":")
+	if sidekiq_ns ~= "" then
+		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
 	end
 	if redis.call("exists", queue_key) == 1 then
 		redis.call("rename", queue_key, puller_queue_key)
