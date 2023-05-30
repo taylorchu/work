@@ -26,8 +26,8 @@ github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.3 h1:RP3t2pwF7cMEbC1dqtB6poj3niw/9gnV4Cjg5oW5gtY=
 github.com/stretchr/testify v1.8.3/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
-github.com/taylorchu/work v0.2.14-0.20230530162351-3b8a47bc17d5 h1:WSZ7yQsyhLt6oKDFOJXJQqj/Re5WnOiQLBy/d6EScW0=
-github.com/taylorchu/work v0.2.14-0.20230530162351-3b8a47bc17d5/go.mod h1:VJZBvKbZZl5uMIiAntg7U1/k62ZLPDkMutQDUflU39A=
+github.com/taylorchu/work v0.2.14-0.20230530170027-763ac8a6a188 h1:1+OOpZo4FP5rAOwszpbfZHXiiCIfQoyd+JxIFMWwhHU=
+github.com/taylorchu/work v0.2.14-0.20230530170027-763ac8a6a188/go.mod h1:odiN6biN1gBlZmtJc8uHqzx5KfiimIcRq5sQU/U5Jqg=
 github.com/vmihailenco/msgpack/v5 v5.3.5 h1:5gO0H1iULLWGhs2H5tbAHIZTV8/cYafcFOr9znI5mJU=
 github.com/vmihailenco/msgpack/v5 v5.3.5/go.mod h1:7xyJ9e+0+9SaZT0Wt1RGleJXzli6Q/V5KbhBonMG9jc=
 github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAhO7/IwNM9g=

@@ -7,7 +7,7 @@ require (
 	github.com/gomodule/redigo v1.8.8
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/stretchr/testify v1.8.3
-	github.com/taylorchu/work v0.2.14-0.20230530162351-3b8a47bc17d5
+	github.com/taylorchu/work v0.2.14-0.20230530170027-763ac8a6a188
 )
 
 require (
