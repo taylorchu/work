@@ -27,7 +27,7 @@ jobs:
       - image: << parameters.go-image >>
         environment:
           - GO111MODULE=on
-          - REDIS_ADDR=:7000,:7001,:7002
+          - REDIS_ADDR=:7000,:7001,:7002,:7003,:7004
       - image: << parameters.redis-image >>
         command:
           - --cluster-enabled
@@ -52,13 +52,29 @@ jobs:
           - "7002"
           - --cluster-config-file
           - 7002.conf
+      - image: << parameters.redis-image >>
+        command:
+          - --cluster-enabled
+          - "yes"
+          - --port
+          - "7003"
+          - --cluster-config-file
+          - 7003.conf
+      - image: << parameters.redis-image >>
+        command:
+          - --cluster-enabled
+          - "yes"
+          - --port
+          - "7004"
+          - --cluster-config-file
+          - 7004.conf
     steps:
       - checkout
       - run: go install honnef.co/go/tools/cmd/staticcheck@latest
       - run: staticcheck -checks all,-ST1000 ./...
-      - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
+      - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002 -wait tcp://:7003 -wait tcp://:7004
       - run: sudo apt-get update && sudo apt-get install redis-tools
-      - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002
+      - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004
       - run: go test -p 1 -v ./...
   fossa:
     docker:
