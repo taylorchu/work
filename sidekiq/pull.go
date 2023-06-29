@@ -44,13 +44,17 @@ func (opt *PullOptions) Validate() error {
 	return nil
 }
 
+func formatQueueNamespace(namespace, queue string) string {
+	return fmt.Sprintf("%s:sidekiq-queue-pull:%s", namespace, queue)
+}
+
 // Pull moves jobs from sidekiq-compatible queue into work-compatible queue.
 func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
 	}
-	queueNamespace := fmt.Sprintf("%s:sidekiq-queue-pull:%s", opt.SidekiqNamespace, opt.SidekiqQueue)
+	queueNamespace := formatQueueNamespace(opt.SidekiqNamespace, opt.SidekiqQueue)
 	queueID := uuid.NewString()
 
 	ctx, cancel := context.WithCancel(context.Background())
