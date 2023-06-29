@@ -189,7 +189,7 @@ func (q *redisQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
 		args[2+3*i+1] = job.ID
 		args[2+3*i+2] = jobm
 	}
-	return q.enqueueScript.Run(context.Background(), q.client, nil, args...).Err()
+	return q.enqueueScript.Run(context.Background(), q.client, []string{opt.Namespace}, args...).Err()
 }
 
 func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
@@ -205,7 +205,7 @@ func (q *redisQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, erro
 	if err != nil {
 		return nil, err
 	}
-	res, err := q.dequeueScript.Run(context.Background(), q.client, nil,
+	res, err := q.dequeueScript.Run(context.Background(), q.client, []string{opt.Namespace},
 		opt.Namespace,
 		opt.QueueID,
 		opt.At.Unix(),
@@ -249,7 +249,7 @@ func (q *redisQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
 	for i, job := range jobs {
 		args[2+i] = job.ID
 	}
-	return q.ackScript.Run(context.Background(), q.client, nil, args...).Err()
+	return q.ackScript.Run(context.Background(), q.client, []string{opt.Namespace}, args...).Err()
 }
 
 func (q *redisQueue) BulkFind(jobIDs []string, opt *FindOptions) ([]*Job, error) {
@@ -265,7 +265,7 @@ func (q *redisQueue) BulkFind(jobIDs []string, opt *FindOptions) ([]*Job, error)
 	for i, jobID := range jobIDs {
 		args[1+i] = jobID
 	}
-	res, err := q.findScript.Run(context.Background(), q.client, nil, args...).Result()
+	res, err := q.findScript.Run(context.Background(), q.client, []string{opt.Namespace}, args...).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, e
 	if err != nil {
 		return nil, err
 	}
-	res, err := q.metricScript.Run(context.Background(), q.client, nil,
+	res, err := q.metricScript.Run(context.Background(), q.client, []string{opt.Namespace},
 		opt.Namespace,
 		opt.QueueID,
 		opt.At.Unix(),

@@ -58,7 +58,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 
 	expireInSec := 10
 	refreshInSec := 2
-	err = q.dequeueStartScript.Run(ctx, q.client, nil,
+	err = q.dequeueStartScript.Run(ctx, q.client, []string{queueNamespace},
 		opt.SidekiqNamespace,
 		opt.SidekiqQueue,
 		queueNamespace,
@@ -70,7 +70,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		return err
 	}
 	defer func() error {
-		return q.dequeueStopScript.Run(ctx, q.client, nil,
+		return q.dequeueStopScript.Run(ctx, q.client, []string{queueNamespace},
 			queueNamespace,
 			queueID,
 		).Err()
@@ -82,7 +82,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 			case <-ctx.Done():
 				return
 			case <-time.After(time.Duration(refreshInSec) * time.Second):
-				err := q.dequeueHeartbeatScript.Run(ctx, q.client, nil,
+				err := q.dequeueHeartbeatScript.Run(ctx, q.client, []string{queueNamespace},
 					queueNamespace,
 					queueID,
 					time.Now().Unix(),
@@ -96,7 +96,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	}()
 
 	pull := func() error {
-		res, err := q.dequeueScript.Run(ctx, q.client, nil,
+		res, err := q.dequeueScript.Run(ctx, q.client, []string{queueNamespace},
 			queueNamespace,
 			queueID,
 		).Result()
@@ -140,7 +140,7 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 				return err
 			}
 		}
-		err = q.ackScript.Run(ctx, q.client, nil,
+		err = q.ackScript.Run(ctx, q.client, []string{queueNamespace},
 			queueNamespace,
 			queueID,
 			res.(string),

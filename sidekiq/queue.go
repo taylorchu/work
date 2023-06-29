@@ -224,5 +224,5 @@ func FormatQueueID(queue, class string) string {
 }
 
 func (q *sidekiqQueue) schedule(ns string, at time.Time) error {
-	return q.scheduleScript.Run(context.Background(), q.client, nil, ns, at.Unix()).Err()
+	return q.scheduleScript.Run(context.Background(), q.client, []string{ns}, ns, at.Unix()).Err()
 }

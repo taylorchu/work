@@ -42,7 +42,7 @@ func (l *Lock) Acquire() (bool, error) {
 	return 0
 	`)
 
-	acquired, err := lockScript.Run(context.Background(), l.Client, nil,
+	acquired, err := lockScript.Run(context.Background(), l.Client, []string{l.Key},
 		l.Key,
 		l.ID,
 		l.At.Unix(),
@@ -63,7 +63,7 @@ func (l *Lock) Release() error {
 
 	return redis.call("zrem", lock_key, lock_id)
 	`)
-	err := unlockScript.Run(context.Background(), l.Client, nil,
+	err := unlockScript.Run(context.Background(), l.Client, []string{l.Key},
 		l.Key,
 		l.ID,
 	).Err()
