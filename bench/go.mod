@@ -5,9 +5,9 @@ go 1.19
 require (
 	github.com/gocraft/work v0.5.2-0.20180912175354-c85b71e20062
 	github.com/gomodule/redigo v1.8.8
-	github.com/redis/go-redis/v9 v9.0.2
-	github.com/stretchr/testify v1.8.3
-	github.com/taylorchu/work v0.2.14-0.20230530170027-763ac8a6a188
+	github.com/redis/go-redis/v9 v9.0.5
+	github.com/stretchr/testify v1.8.4
+	github.com/taylorchu/work v0.2.14-0.20230629213330-8e7c6a7ee890
 )
 
 require (
