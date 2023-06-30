@@ -27,7 +27,7 @@ func TestHeartbeater(t *testing.T) {
 	hb := Heartbeater(&HeartbeaterOptions{
 		Queue:        work.NewRedisQueue(client),
 		InvisibleSec: 30,
-		IntervalSec:  1,
+		IntervalSec:  10,
 	})
 
 	h := hb(func(*work.Job, *work.DequeueOptions) error {
