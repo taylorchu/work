@@ -23,9 +23,9 @@ type HeartbeaterOptions struct {
 func Heartbeater(hopts *HeartbeaterOptions) work.HandleMiddleware {
 	return func(f work.HandleFunc) work.HandleFunc {
 		return func(job *work.Job, opt *work.DequeueOptions) error {
+			copiedJob := *job
 			refresh := func() error {
 				now := time.Now()
-				copiedJob := *job
 				copiedJob.UpdatedAt = now
 				copiedJob.EnqueuedAt = now.Add(time.Duration(hopts.InvisibleSec) * time.Second)
 				return hopts.Queue.Enqueue(&copiedJob, &work.EnqueueOptions{
@@ -57,6 +57,8 @@ func Heartbeater(hopts *HeartbeaterOptions) work.HandleMiddleware {
 			err := f(job, opt)
 			cancel()
 			<-done
+			job.UpdatedAt = copiedJob.UpdatedAt
+			job.EnqueuedAt = copiedJob.EnqueuedAt
 			return err
 		}
 	}
