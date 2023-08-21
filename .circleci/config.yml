@@ -59,6 +59,7 @@ jobs:
       - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
       - run: sudo apt-get update && sudo apt-get install redis-tools
       - run: echo yes | redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002
+      - run: sleep 4
       - run: go test -p 1 -v ./...
   fossa:
     docker:
