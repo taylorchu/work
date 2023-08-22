@@ -41,9 +41,9 @@ type PullOptions struct {
 
 // Puller validation errors
 var (
-	ErrPullExpireInSec  = errors.New("sidekiq: PullExpireInSec should be > 0")
-	ErrPullRefreshInSec = errors.New("sidekiq: PullRefreshInSec should be > 0")
-	ErrPullMaxJobs      = errors.New("sidekiq: PullMaxJobs should be > 0")
+	ErrPullExpireInSec  = errors.New("sidekiq: ExpireInSec should be > 0")
+	ErrPullRefreshInSec = errors.New("sidekiq: RefreshInSec should be > 0")
+	ErrPullMaxJobs      = errors.New("sidekiq: MaxJobs should be > 0")
 )
 
 // Validate validates PullOptions.
