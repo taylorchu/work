@@ -465,7 +465,7 @@ func TestRetry(t *testing.T) {
 	require.EqualValues(t, 0, job.Retries)
 	require.Equal(t, "", job.LastError)
 
-	var delays []int64
+	var delays []float64
 	for i := 1; i <= 10; i++ {
 		retryErr := fmt.Errorf("error %d", i)
 		h = retrier(func(*Job, *DequeueOptions) error {
@@ -489,12 +489,12 @@ func TestRetry(t *testing.T) {
 		require.Len(t, z, 1)
 		require.EqualValues(t, job.EnqueuedAt.Unix(), z[0].Score)
 
-		delays = append(delays, job.EnqueuedAt.Unix()-time.Now().Unix())
+		delays = append(delays, time.Until(job.EnqueuedAt).Seconds())
 	}
 
 	t.Log("delay", delays)
-	for i := 2; i < len(delays); i += 2 {
-		require.True(t, delays[i] > delays[i-2])
+	for i := 1; i < len(delays); i++ {
+		require.True(t, delays[i] > delays[i-1])
 		require.True(t, delays[i] > 1)
 	}
 }
