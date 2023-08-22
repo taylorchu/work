@@ -34,6 +34,7 @@ func TestPullDequeueStartEmpty(t *testing.T) {
 		"123",
 		now.Unix(),
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -64,6 +65,7 @@ func TestPullDequeueStartNormal(t *testing.T) {
 		"123",
 		now.Unix(),
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -110,6 +112,7 @@ func TestPullDequeueStartAlreadyStarted(t *testing.T) {
 		"123",
 		now.Unix(),
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -130,6 +133,7 @@ func TestPullDequeueStartAlreadyStarted(t *testing.T) {
 		"123",
 		now.Unix(),
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -164,6 +168,7 @@ func TestPullDequeueStartRecoveredNotExpired(t *testing.T) {
 		"123",
 		now.Unix(),
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -201,6 +206,7 @@ func TestPullDequeueStartRecoveredNotExpired(t *testing.T) {
 		"456",
 		now.Unix()+1,
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -253,6 +259,7 @@ func TestPullDequeueStartRecoveredExpired(t *testing.T) {
 		"123",
 		now.Unix(),
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -290,6 +297,7 @@ func TestPullDequeueStartRecoveredExpired(t *testing.T) {
 		"456",
 		now.Unix()+30,
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -340,6 +348,7 @@ func TestPullDequeueStop(t *testing.T) {
 		"123",
 		now.Unix(),
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 
@@ -397,6 +406,7 @@ func TestPullDequeueHeartbeat(t *testing.T) {
 		"123",
 		now.Unix(),
 		10,
+		1,
 	).Err()
 	require.NoError(t, err)
 

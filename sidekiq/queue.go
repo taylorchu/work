@@ -117,6 +117,7 @@ func NewQueue(client redis.UniversalClient) Queue {
 	local queue_id = ARGV[4]
 	local at = tonumber(ARGV[5])
 	local expire_in_sec = tonumber(ARGV[6])
+	local max_jobs = tonumber(ARGV[7])
 
 	local pullers_key = table.concat({queue_ns, "pullers"}, ":")
 	if redis.call("zadd", pullers_key, "nx", at + expire_in_sec, queue_id) == 0 then
@@ -137,8 +138,13 @@ func NewQueue(client redis.UniversalClient) Queue {
 	if sidekiq_ns ~= "" then
 		queue_key = table.concat({sidekiq_ns, queue_key}, ":")
 	end
-	if redis.call("exists", queue_key) == 1 then
-		redis.call("rename", queue_key, puller_queue_key)
+
+	for i = 1,max_jobs do
+		local jobm = redis.call("rpop", queue_key)
+		if jobm == false then
+			break
+		end
+		redis.call("lpush", puller_queue_key, jobm)
 	end
 	return 1
 	`)

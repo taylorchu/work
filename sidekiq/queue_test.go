@@ -105,6 +105,9 @@ func TestSidekiqQueueExternalDequeue(t *testing.T) {
 		Namespace:        "{sidekiq}",
 		SidekiqNamespace: "{sidekiq}",
 		SidekiqQueue:     "default",
+		ExpireInSec:      10,
+		RefreshInSec:     2,
+		MaxJobs:          10,
 	})
 	require.NoError(t, err)
 	job, err := q.Dequeue(&work.DequeueOptions{
@@ -205,6 +208,9 @@ func TestSidekiqQueueDequeue(t *testing.T) {
 		Namespace:        "{ns1}",
 		SidekiqNamespace: "{ns1}",
 		SidekiqQueue:     "low",
+		ExpireInSec:      10,
+		RefreshInSec:     2,
+		MaxJobs:          10,
 	})
 	require.NoError(t, err)
 	jobDequeued, err := q.Dequeue(&work.DequeueOptions{
@@ -446,6 +452,9 @@ func TestSidekiqQueueEnqueueDuplicated(t *testing.T) {
 		Namespace:        "{ns1}",
 		SidekiqNamespace: "{ns1}",
 		SidekiqQueue:     "low",
+		ExpireInSec:      10,
+		RefreshInSec:     2,
+		MaxJobs:          10,
 	})
 	require.NoError(t, err)
 	jobDequeued, err := q.Dequeue(&work.DequeueOptions{
@@ -514,6 +523,9 @@ func TestSidekiqQueueEnqueueDuplicated(t *testing.T) {
 		Namespace:        "{ns1}",
 		SidekiqNamespace: "{ns1}",
 		SidekiqQueue:     "low",
+		ExpireInSec:      10,
+		RefreshInSec:     2,
+		MaxJobs:          10,
 	})
 	require.NoError(t, err)
 
