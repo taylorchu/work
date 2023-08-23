@@ -90,6 +90,62 @@ func TestPullDequeueStartNormal(t *testing.T) {
 	require.EqualValues(t, now.Unix()+10, z[0].Score)
 }
 
+func TestPullDequeueStartNormalFirstN(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+
+	jobIDs := []string{"83b27ea26dd65821239ca6aa", "ebb3186ec09c42642f980a20", "7e59de95478191698aa69b22"}
+	for _, jobID := range jobIDs {
+		err := client.LPush(context.Background(), pullTestSidekiqQueueKey, fmt.Sprintf(`{"class":"TestWorker","args":[],"retry":3,"queue":"default","backtrace":true,"jid":%q,"created_at":1567788641.0875323,"enqueued_at":1567788642.0879307,"retry_count":2,"error_message":"error: test","error_class":"StandardError","failed_at":1567791043,"retried_at":1567791046}"`, jobID)).Err()
+		require.NoError(t, err)
+	}
+
+	l, err := client.LRange(context.Background(), pullTestSidekiqQueueKey, 0, -1).Result()
+	require.NoError(t, err)
+	require.Len(t, l, 3)
+	require.Contains(t, l[0], jobIDs[2])
+	require.Contains(t, l[1], jobIDs[1])
+	require.Contains(t, l[2], jobIDs[0])
+
+	q := NewQueue(client)
+	now := time.Now()
+
+	err = q.(*sidekiqQueue).dequeueStartScript.Run(context.Background(), client, []string{pullTestNamespace},
+		pullTestSidekiqNamespace,
+		pullTestSidekiqQueue,
+		pullTestNamespace,
+		"123",
+		now.Unix(),
+		10,
+		2,
+	).Err()
+	require.NoError(t, err)
+
+	l, err = client.LRange(context.Background(), pullTestSidekiqQueueKey, 0, -1).Result()
+	require.NoError(t, err)
+	require.Len(t, l, 1)
+	require.Contains(t, l[0], jobIDs[2])
+
+	l, err = client.LRange(context.Background(), fmt.Sprintf("%s:123", pullTestNamespace), 0, -1).Result()
+	require.NoError(t, err)
+	require.Len(t, l, 2)
+	require.Contains(t, l[0], jobIDs[1])
+	require.Contains(t, l[1], jobIDs[0])
+
+	z, err := client.ZRangeByScoreWithScores(
+		context.Background(),
+		pullTestPullersKey,
+		&redis.ZRangeBy{
+			Min: "-inf",
+			Max: "+inf",
+		}).Result()
+	require.NoError(t, err)
+	require.Len(t, z, 1)
+	require.Equal(t, "123", z[0].Member)
+	require.EqualValues(t, now.Unix()+10, z[0].Score)
+}
+
 func TestPullDequeueStartAlreadyStarted(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
