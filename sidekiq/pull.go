@@ -31,7 +31,20 @@ type PullOptions struct {
 	SidekiqNamespace string
 	// sidekiq-compatible queue like `default`.
 	SidekiqQueue string
+	// ExpireInSec controls how long puller expires.
+	ExpireInSec int64
+	// RefreshInSec controls how often job ExpireInSec is refreshed.
+	RefreshInSec int64
+	// MaxJobs controls how many jobs is pulled at once.
+	MaxJobs int64
 }
+
+// pull validation errors
+var (
+	ErrPullExpireInSec  = errors.New("sidekiq: expire-in sec should be > 0")
+	ErrPullRefreshInSec = errors.New("sidekiq: refresh-in sec should be > 0")
+	ErrPullMaxJobs      = errors.New("sidekiq: max jobs should be > 0")
+)
 
 // Validate validates PullOptions.
 func (opt *PullOptions) Validate() error {
@@ -40,6 +53,15 @@ func (opt *PullOptions) Validate() error {
 	}
 	if opt.SidekiqQueue == "" {
 		return work.ErrEmptyQueueID
+	}
+	if opt.ExpireInSec <= 0 {
+		return ErrPullExpireInSec
+	}
+	if opt.RefreshInSec <= 0 {
+		return ErrPullRefreshInSec
+	}
+	if opt.MaxJobs <= 0 {
+		return ErrPullMaxJobs
 	}
 	return nil
 }
@@ -60,15 +82,14 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	expireInSec := 10
-	refreshInSec := 2
 	err = q.dequeueStartScript.Run(ctx, q.client, []string{queueNamespace},
 		opt.SidekiqNamespace,
 		opt.SidekiqQueue,
 		queueNamespace,
 		queueID,
 		time.Now().Unix(),
-		expireInSec,
+		opt.ExpireInSec,
+		opt.MaxJobs,
 	).Err()
 	if err != nil {
 		return err
@@ -85,12 +106,12 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(time.Duration(refreshInSec) * time.Second):
+			case <-time.After(time.Duration(opt.RefreshInSec) * time.Second):
 				err := q.dequeueHeartbeatScript.Run(ctx, q.client, []string{queueNamespace},
 					queueNamespace,
 					queueID,
 					time.Now().Unix(),
-					expireInSec,
+					opt.ExpireInSec,
 				).Err()
 				if err != nil {
 					return
