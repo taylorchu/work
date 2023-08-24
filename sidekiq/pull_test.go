@@ -546,13 +546,17 @@ func TestPullDequeueAck(t *testing.T) {
 	require.Contains(t, jobm[1], "ebb3186ec09c42642f980a20")
 	require.Contains(t, jobm[2], "83b27ea26dd65821239ca6aa")
 
+	count, err := client.LLen(context.Background(), pullTestSidekiqQueueKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(3), count)
+
 	err = q.(*sidekiqQueue).ackScript.Run(context.Background(), client, []string{pullTestNamespace},
 		pullTestSidekiqNamespace,
 		fmt.Sprintf("queue:%s", pullTestSidekiqQueue),
 	).Err()
 	require.NoError(t, err)
 
-	count, err := client.Exists(context.Background(), pullTestSidekiqQueueKey).Result()
+	count, err = client.LLen(context.Background(), pullTestSidekiqQueueKey).Result()
 	require.NoError(t, err)
 	require.Equal(t, int64(0), count)
 }
