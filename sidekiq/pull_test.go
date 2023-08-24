@@ -520,3 +520,39 @@ func TestPullDequeueHeartbeat(t *testing.T) {
 	require.Equal(t, "123", z[0].Member)
 	require.EqualValues(t, now.Unix()+100, z[0].Score)
 }
+
+func TestPullDequeueAck(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+
+	jobIDs := []string{"83b27ea26dd65821239ca6aa", "ebb3186ec09c42642f980a20", "7e59de95478191698aa69b22"}
+	for _, jobID := range jobIDs {
+		err := client.LPush(context.Background(), pullTestSidekiqQueueKey, fmt.Sprintf(`{"class":"TestWorker","args":[],"retry":3,"queue":"default","backtrace":true,"jid":%q,"created_at":1567788641.0875323,"enqueued_at":1567788642.0879307,"retry_count":2,"error_message":"error: test","error_class":"StandardError","failed_at":1567791043,"retried_at":1567791046}"`, jobID)).Err()
+		require.NoError(t, err)
+	}
+
+	q := NewQueue(client)
+
+	res, err := q.(*sidekiqQueue).dequeueScript.Run(context.Background(), client, []string{pullTestNamespace},
+		pullTestSidekiqNamespace,
+		fmt.Sprintf("queue:%s", pullTestSidekiqQueue),
+	).Result()
+	require.NoError(t, err)
+
+	jobm := res.([]interface{})
+	require.Len(t, jobm, 3)
+	require.Contains(t, jobm[0], "7e59de95478191698aa69b22")
+	require.Contains(t, jobm[1], "ebb3186ec09c42642f980a20")
+	require.Contains(t, jobm[2], "83b27ea26dd65821239ca6aa")
+
+	err = q.(*sidekiqQueue).ackScript.Run(context.Background(), client, []string{pullTestNamespace},
+		pullTestSidekiqNamespace,
+		fmt.Sprintf("queue:%s", pullTestSidekiqQueue),
+	).Err()
+	require.NoError(t, err)
+
+	count, err := client.Exists(context.Background(), pullTestSidekiqQueueKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(0), count)
+}

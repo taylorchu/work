@@ -98,7 +98,7 @@ func NewQueue(client redis.UniversalClient) Queue {
 	local queue_id = ARGV[2]
 
 	local queue_key = table.concat({queue_ns, queue_id}, ":")
-	return redis.call("lrange", queue_key, -1, 0)
+	return redis.call("lrange", queue_key, 0, -1)
 	`)
 
 	ackScript := redis.NewScript(`
