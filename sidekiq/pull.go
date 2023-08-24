@@ -120,16 +120,24 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		}
 	}()
 
-	pull := func() error {
-		res, err := q.dequeueScript.Run(ctx, q.client, []string{queueNamespace},
-			queueNamespace,
-			queueID,
-		).Result()
-		if err != nil {
-			return err
+	res, err := q.dequeueScript.Run(ctx, q.client, []string{queueNamespace},
+		queueNamespace,
+		queueID,
+	).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil
 		}
+		return err
+	}
+	queue := opt.Queue
+	if queue == nil {
+		queue = q.RedisQueue
+	}
+	jobm := res.([]interface{})
+	for _, iface := range jobm {
 		var sqJob sidekiqJob
-		err = json.NewDecoder(strings.NewReader(res.(string))).Decode(&sqJob)
+		err := json.NewDecoder(strings.NewReader(iface.(string))).Decode(&sqJob)
 		if err != nil {
 			return err
 		}
@@ -140,10 +148,6 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		job, err := newJob(&sqJob)
 		if err != nil {
 			return err
-		}
-		queue := opt.Queue
-		if queue == nil {
-			queue = q.RedisQueue
 		}
 		var found bool
 		if finder, ok := queue.(work.BulkJobFinder); ok {
@@ -165,24 +169,13 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 				return err
 			}
 		}
-		err = q.ackScript.Run(ctx, q.client, []string{queueNamespace},
-			queueNamespace,
-			queueID,
-			res.(string),
-		).Err()
-		if err != nil {
-			return err
-		}
-		return nil
 	}
-
-	for {
-		err := pull()
-		if err != nil {
-			if errors.Is(err, redis.Nil) {
-				return nil
-			}
-			return err
-		}
+	err = q.ackScript.Run(ctx, q.client, []string{queueNamespace},
+		queueNamespace,
+		queueID,
+	).Err()
+	if err != nil {
+		return err
 	}
+	return nil
 }
