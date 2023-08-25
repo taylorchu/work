@@ -120,16 +120,26 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		}
 	}()
 
-	pull := func() error {
-		res, err := q.dequeueScript.Run(ctx, q.client, []string{queueNamespace},
-			queueNamespace,
-			queueID,
-		).Result()
-		if err != nil {
-			return err
+	res, err := q.dequeueScript.Run(ctx, q.client, []string{queueNamespace},
+		queueNamespace,
+		queueID,
+	).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil
 		}
+		return err
+	}
+	queue := opt.Queue
+	if queue == nil {
+		queue = q.RedisQueue
+	}
+	jobm := res.([]interface{})
+	jobs := make([]*work.Job, len(jobm))
+	queueIDs := make([]string, len(jobm))
+	for i, iface := range jobm {
 		var sqJob sidekiqJob
-		err = json.NewDecoder(strings.NewReader(res.(string))).Decode(&sqJob)
+		err := json.NewDecoder(strings.NewReader(iface.(string))).Decode(&sqJob)
 		if err != nil {
 			return err
 		}
@@ -141,48 +151,62 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		if err != nil {
 			return err
 		}
-		queue := opt.Queue
-		if queue == nil {
-			queue = q.RedisQueue
+		jobs[i] = job
+		queueIDs[i] = FormatQueueID(sqJob.Queue, sqJob.Class)
+	}
+	found := make([]*work.Job, len(jobs))
+	if finder, ok := queue.(work.BulkJobFinder); ok {
+		jobIDs := make([]string, len(jobs))
+		for i, job := range jobs {
+			jobIDs[i] = job.ID
 		}
-		var found bool
-		if finder, ok := queue.(work.BulkJobFinder); ok {
-			// best effort to check for duplicates
-			jobs, err := finder.BulkFind([]string{job.ID}, &work.FindOptions{
+		// best effort to check for duplicates
+		foundJobs, err := finder.BulkFind(jobIDs, &work.FindOptions{
+			Namespace: opt.Namespace,
+		})
+		if err != nil {
+			return err
+		}
+		found = foundJobs
+	}
+	if bulkEnqueuer, ok := queue.(work.BulkEnqueuer); ok {
+		m := make(map[string][]*work.Job)
+		for i, job := range jobs {
+			if found[i] != nil {
+				continue
+			}
+			queueID := queueIDs[i]
+			m[queueID] = append(m[queueID], job)
+		}
+		for queueID, jobs := range m {
+			err := bulkEnqueuer.BulkEnqueue(jobs, &work.EnqueueOptions{
 				Namespace: opt.Namespace,
+				QueueID:   queueID,
 			})
 			if err != nil {
 				return err
 			}
-			found = len(jobs) == 1 && jobs[0] != nil
 		}
-		if !found {
+	} else {
+		for i, job := range jobs {
+			if found[i] != nil {
+				continue
+			}
 			err := queue.Enqueue(job, &work.EnqueueOptions{
 				Namespace: opt.Namespace,
-				QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
+				QueueID:   queueIDs[i],
 			})
 			if err != nil {
 				return err
 			}
 		}
-		err = q.ackScript.Run(ctx, q.client, []string{queueNamespace},
-			queueNamespace,
-			queueID,
-			res.(string),
-		).Err()
-		if err != nil {
-			return err
-		}
-		return nil
 	}
-
-	for {
-		err := pull()
-		if err != nil {
-			if errors.Is(err, redis.Nil) {
-				return nil
-			}
-			return err
-		}
+	err = q.ackScript.Run(ctx, q.client, []string{queueNamespace},
+		queueNamespace,
+		queueID,
+	).Err()
+	if err != nil {
+		return err
 	}
+	return nil
 }

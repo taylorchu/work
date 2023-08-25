@@ -98,16 +98,15 @@ func NewQueue(client redis.UniversalClient) Queue {
 	local queue_id = ARGV[2]
 
 	local queue_key = table.concat({queue_ns, queue_id}, ":")
-	return redis.call("lindex", queue_key, -1)
+	return redis.call("lrange", queue_key, 0, -1)
 	`)
 
 	ackScript := redis.NewScript(`
 	local queue_ns = ARGV[1]
 	local queue_id = ARGV[2]
-	local jobm = ARGV[3]
 
 	local queue_key = table.concat({queue_ns, queue_id}, ":")
-	return redis.call("lrem", queue_key, -1, jobm)
+	return redis.call("del", queue_key)
 	`)
 
 	dequeueStartScript := redis.NewScript(`
@@ -156,7 +155,6 @@ func NewQueue(client redis.UniversalClient) Queue {
 	local puller_queue_key = table.concat({queue_ns, queue_id}, ":")
 	local pullers_key = table.concat({queue_ns, "pullers"}, ":")
 	if redis.call("llen", puller_queue_key) == 0 then
-		redis.call("del", puller_queue_key)
 		return redis.call("zrem", pullers_key, queue_id)
 	end
 	return 0
