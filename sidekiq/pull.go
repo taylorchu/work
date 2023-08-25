@@ -135,7 +135,9 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		queue = q.RedisQueue
 	}
 	jobm := res.([]interface{})
-	for _, iface := range jobm {
+	jobs := make([]*work.Job, len(jobm))
+	queueIDs := make([]string, len(jobm))
+	for i, iface := range jobm {
 		var sqJob sidekiqJob
 		err := json.NewDecoder(strings.NewReader(iface.(string))).Decode(&sqJob)
 		if err != nil {
@@ -149,21 +151,50 @@ func (q *sidekiqQueue) Pull(opt *PullOptions) error {
 		if err != nil {
 			return err
 		}
-		var found bool
-		if finder, ok := queue.(work.BulkJobFinder); ok {
-			// best effort to check for duplicates
-			jobs, err := finder.BulkFind([]string{job.ID}, &work.FindOptions{
+		jobs[i] = job
+		queueIDs[i] = FormatQueueID(sqJob.Queue, sqJob.Class)
+	}
+	found := make([]*work.Job, len(jobs))
+	if finder, ok := queue.(work.BulkJobFinder); ok {
+		jobIDs := make([]string, len(jobs))
+		for i, job := range jobs {
+			jobIDs[i] = job.ID
+		}
+		// best effort to check for duplicates
+		foundJobs, err := finder.BulkFind(jobIDs, &work.FindOptions{
+			Namespace: opt.Namespace,
+		})
+		if err != nil {
+			return err
+		}
+		found = foundJobs
+	}
+	if bulkEnqueuer, ok := queue.(work.BulkEnqueuer); ok {
+		m := make(map[string][]*work.Job)
+		for i, job := range jobs {
+			if found[i] != nil {
+				continue
+			}
+			queueID := queueIDs[i]
+			m[queueID] = append(m[queueID], job)
+		}
+		for queueID, jobs := range m {
+			err := bulkEnqueuer.BulkEnqueue(jobs, &work.EnqueueOptions{
 				Namespace: opt.Namespace,
+				QueueID:   queueID,
 			})
 			if err != nil {
 				return err
 			}
-			found = len(jobs) == 1 && jobs[0] != nil
 		}
-		if !found {
+	} else {
+		for i, job := range jobs {
+			if found[i] != nil {
+				continue
+			}
 			err := queue.Enqueue(job, &work.EnqueueOptions{
 				Namespace: opt.Namespace,
-				QueueID:   FormatQueueID(sqJob.Queue, sqJob.Class),
+				QueueID:   queueIDs[i],
 			})
 			if err != nil {
 				return err
