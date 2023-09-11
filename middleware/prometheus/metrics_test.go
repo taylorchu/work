@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/require"
 	"github.com/taylorchu/work"
@@ -13,6 +14,10 @@ import (
 )
 
 func TestHandleFuncMetrics(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	err := RegisterMetrics(reg)
+	require.NoError(t, err)
+
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
 		Namespace: "{ns1}",
@@ -22,7 +27,7 @@ func TestHandleFuncMetrics(t *testing.T) {
 		return nil
 	})
 
-	err := h(job, opt)
+	err = h(job, opt)
 	require.NoError(t, err)
 
 	h = HandleFuncMetrics(func(*work.Job, *work.DequeueOptions) error {
@@ -32,7 +37,8 @@ func TestHandleFuncMetrics(t *testing.T) {
 	require.Error(t, err)
 
 	r := httptest.NewRecorder()
-	promhttp.Handler().ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
+	promhttp.HandlerFor(reg, promhttp.HandlerOpts{}).
+		ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
 
 	for _, m := range []string{
 		`work_job_executed_total{`,
@@ -44,6 +50,10 @@ func TestHandleFuncMetrics(t *testing.T) {
 }
 
 func TestEnqueueFuncMetrics(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	err := RegisterMetrics(reg)
+	require.NoError(t, err)
+
 	job := work.NewJob()
 	opt := &work.EnqueueOptions{
 		Namespace: "{ns1}",
@@ -53,7 +63,7 @@ func TestEnqueueFuncMetrics(t *testing.T) {
 		return nil
 	})
 
-	err := h(job, opt)
+	err = h(job, opt)
 	require.NoError(t, err)
 
 	h = EnqueueFuncMetrics(func(*work.Job, *work.EnqueueOptions) error {
@@ -63,7 +73,8 @@ func TestEnqueueFuncMetrics(t *testing.T) {
 	require.Error(t, err)
 
 	r := httptest.NewRecorder()
-	promhttp.Handler().ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
+	promhttp.HandlerFor(reg, promhttp.HandlerOpts{}).
+		ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
 
 	for _, m := range []string{
 		`work_job_enqueued_total{`,
@@ -73,6 +84,10 @@ func TestEnqueueFuncMetrics(t *testing.T) {
 }
 
 func TestExportWorkerMetrics(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	err := RegisterMetrics(reg)
+	require.NoError(t, err)
+
 	client := redistest.NewClient()
 	defer client.Close()
 	require.NoError(t, redistest.Reset(client))
@@ -81,7 +96,7 @@ func TestExportWorkerMetrics(t *testing.T) {
 		Namespace: "{ns1}",
 		Queue:     work.NewRedisQueue(client),
 	})
-	err := w.Register("test",
+	err = w.Register("test",
 		func(*work.Job, *work.DequeueOptions) error { return nil },
 		&work.JobOptions{
 			MaxExecutionTime: time.Second,
@@ -95,7 +110,8 @@ func TestExportWorkerMetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	r := httptest.NewRecorder()
-	promhttp.Handler().ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
+	promhttp.HandlerFor(reg, promhttp.HandlerOpts{}).
+		ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
 
 	for _, m := range []string{
 		`job_ready{`,
