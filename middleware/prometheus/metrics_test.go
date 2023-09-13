@@ -40,6 +40,7 @@ func TestHandleFuncMetrics(t *testing.T) {
 	promhttp.HandlerFor(reg, promhttp.HandlerOpts{}).
 		ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
 
+	t.Log(r.Body.String())
 	for _, m := range []string{
 		`work_job_executed_total{`,
 		`work_job_execution_time_seconds_bucket{`,
@@ -76,6 +77,7 @@ func TestEnqueueFuncMetrics(t *testing.T) {
 	promhttp.HandlerFor(reg, promhttp.HandlerOpts{}).
 		ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
 
+	t.Log(r.Body.String())
 	for _, m := range []string{
 		`work_job_enqueued_total{`,
 	} {
@@ -113,6 +115,7 @@ func TestExportWorkerMetrics(t *testing.T) {
 	promhttp.HandlerFor(reg, promhttp.HandlerOpts{}).
 		ServeHTTP(r, httptest.NewRequest("GET", "/metrics", nil))
 
+	t.Log(r.Body.String())
 	for _, m := range []string{
 		`job_ready{`,
 		`job_scheduled{`,

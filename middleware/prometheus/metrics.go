@@ -13,6 +13,7 @@ var (
 			Namespace: "work",
 			Name:      "job_execution_time_seconds",
 			Help:      "Time for a job to finish successfully",
+			Buckets:   []float64{1, 10, 60},
 		},
 		[]string{"namespace", "queue"},
 	)
@@ -61,6 +62,7 @@ var (
 			Namespace: "work",
 			Name:      "job_latency_seconds",
 			Help:      "Processing delay from oldest ready job",
+			Buckets:   []float64{1, 10, 60},
 		},
 		[]string{"namespace", "queue"},
 	)
