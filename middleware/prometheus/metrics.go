@@ -66,16 +66,23 @@ var (
 	)
 )
 
-func init() {
-	prometheus.MustRegister(jobExecutionTimeSeconds)
-	prometheus.MustRegister(jobExecutedTotal)
-	prometheus.MustRegister(jobBusy)
-
-	prometheus.MustRegister(jobEnqueuedTotal)
-
-	prometheus.MustRegister(jobReady)
-	prometheus.MustRegister(jobScheduled)
-	prometheus.MustRegister(jobLatencySeconds)
+// RegisterMetrics adds all metrics to a prometheus registry.
+func RegisterMetrics(r prometheus.Registerer) error {
+	for _, m := range []prometheus.Collector{
+		jobExecutionTimeSeconds,
+		jobExecutedTotal,
+		jobBusy,
+		jobEnqueuedTotal,
+		jobReady,
+		jobScheduled,
+		jobLatencySeconds,
+	} {
+		err := r.Register(m)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // HandleFuncMetrics adds prometheus metrics like executed job count.

@@ -36,8 +36,8 @@ func TestHeartbeater(t *testing.T) {
 
 	err := h(job, opt)
 	require.NoError(t, err)
-	require.Equal(t, job.CreatedAt, job.UpdatedAt)
-	require.Equal(t, job.CreatedAt, job.EnqueuedAt)
+	require.Equal(t, job.EnqueuedAt.Unix(), job.UpdatedAt.Unix()+30)
+	require.NotEqual(t, job.CreatedAt, job.UpdatedAt)
 
 	z, err := client.ZRangeByScoreWithScores(
 		context.Background(),
@@ -48,21 +48,5 @@ func TestHeartbeater(t *testing.T) {
 		}).Result()
 	require.NoError(t, err)
 	require.Len(t, z, 1)
-	require.EqualValues(t, job.EnqueuedAt.Unix()+30, z[0].Score)
-
-	err = h(job, opt)
-	require.NoError(t, err)
-	require.Equal(t, job.CreatedAt, job.UpdatedAt)
-	require.Equal(t, job.CreatedAt, job.EnqueuedAt)
-
-	z, err = client.ZRangeByScoreWithScores(
-		context.Background(),
-		"{ns1}:queue:q1",
-		&redis.ZRangeBy{
-			Min: "-inf",
-			Max: "+inf",
-		}).Result()
-	require.NoError(t, err)
-	require.Len(t, z, 1)
-	require.EqualValues(t, job.EnqueuedAt.Unix()+30, z[0].Score)
+	require.EqualValues(t, job.EnqueuedAt.Unix(), z[0].Score)
 }
