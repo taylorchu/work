@@ -102,7 +102,7 @@ func TestServer(t *testing.T) {
 		{
 			// bad duration
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/jobs",
 			reqBody: `{
 				"payload": "payload1",
 				"delay": 1
@@ -113,15 +113,17 @@ func TestServer(t *testing.T) {
 		{
 			// bad payload
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/jobs",
 			reqBody:   `{`,
 			respCode:  500,
 			respBody:  "{\"error\":\"unexpected EOF\"}\n",
 		},
 		{
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/jobs",
 			reqBody: `{
+				"namespace": "{ns1}",
+				"queue_id": "q1",
 				"payload": "payload1",
 				"delay": "10s"
 			}`,
@@ -136,8 +138,10 @@ func TestServer(t *testing.T) {
 		},
 		{
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/jobs",
 			reqBody: `{
+				"namespace": "{ns1}",
+				"queue_id": "q1",
 				"payload": "payload1"
 			}`,
 			respCode: 200,
@@ -151,8 +155,10 @@ func TestServer(t *testing.T) {
 		},
 		{
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/jobs",
 			reqBody: `{
+				"namespace": "{ns1}",
+				"queue_id": "q1",
 				"id": "id1",
 				"payload": "payload1"
 			}`,
@@ -162,8 +168,10 @@ func TestServer(t *testing.T) {
 		{
 			// same job id
 			reqMethod: "POST",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/jobs",
 			reqBody: `{
+				"namespace": "{ns1}",
+				"queue_id": "q1",
 				"id": "id1",
 				"payload": "payload2"
 			}`,

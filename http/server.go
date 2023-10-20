@@ -22,9 +22,10 @@ func (opts *ServerOptions) deleteJob(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
-	namespace := r.URL.Query().Get("namespace")
-	queueID := r.URL.Query().Get("queue_id")
-	jobID := r.URL.Query().Get("job_id")
+	query := r.URL.Query()
+	namespace := query.Get("namespace")
+	queueID := query.Get("queue_id")
+	jobID := query.Get("job_id")
 
 	job, err := func() (*work.Job, error) {
 		jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
@@ -76,8 +77,9 @@ func (opts *ServerOptions) getJob(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
-	namespace := r.URL.Query().Get("namespace")
-	jobID := r.URL.Query().Get("job_id")
+	query := r.URL.Query()
+	namespace := query.Get("namespace")
+	jobID := query.Get("job_id")
 
 	job, err := func() (*work.Job, error) {
 		jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
@@ -113,45 +115,48 @@ func (opts *ServerOptions) getJob(rw http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (opts *ServerOptions) createJob(rw http.ResponseWriter, r *http.Request) {
-	namespace := r.URL.Query().Get("namespace")
-	queueID := r.URL.Query().Get("queue_id")
+type CreateJobOptions struct {
+	Namespace string          `json:"namespace"`
+	QueueID   string          `json:"queue_id"`
+	ID        string          `json:"id"`
+	Payload   json.RawMessage `json:"payload"`
+	Delay     duration        `json:"delay"`
+}
 
-	job, err := func() (*work.Job, error) {
-		var enqueueRequest struct {
-			ID      string          `json:"id"`
-			Payload json.RawMessage `json:"payload"`
-			Delay   duration        `json:"delay"`
-		}
-		err := json.NewDecoder(r.Body).Decode(&enqueueRequest)
+func (opts *ServerOptions) createJob(rw http.ResponseWriter, r *http.Request) {
+	job, copt, err := func() (*work.Job, *CreateJobOptions, error) {
+		var copt CreateJobOptions
+		err := json.NewDecoder(r.Body).Decode(&copt)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		job := work.NewJob().Delay(time.Duration(enqueueRequest.Delay))
-		if enqueueRequest.ID != "" {
-			job.ID = enqueueRequest.ID
-		}
-		job.Payload = enqueueRequest.Payload
-		if finder, ok := opts.Queue.(work.BulkJobFinder); ok {
-			// best effort to check for duplicates
-			jobs, err := finder.BulkFind([]string{job.ID}, &work.FindOptions{
-				Namespace: namespace,
-			})
-			if err != nil {
-				return nil, err
-			}
-			if len(jobs) == 1 && jobs[0] != nil {
-				return jobs[0], nil
+		if copt.ID != "" {
+			if finder, ok := opts.Queue.(work.BulkJobFinder); ok {
+				// best effort to check for duplicates
+				jobs, err := finder.BulkFind([]string{copt.ID}, &work.FindOptions{
+					Namespace: copt.Namespace,
+				})
+				if err != nil {
+					return nil, nil, err
+				}
+				if len(jobs) == 1 && jobs[0] != nil {
+					return jobs[0], &copt, nil
+				}
 			}
 		}
+		job := work.NewJob().Delay(time.Duration(copt.Delay))
+		if copt.ID != "" {
+			job.ID = copt.ID
+		}
+		job.Payload = copt.Payload
 		err = opts.Queue.Enqueue(job, &work.EnqueueOptions{
-			Namespace: namespace,
-			QueueID:   queueID,
+			Namespace: copt.Namespace,
+			QueueID:   copt.QueueID,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return job, nil
+		return job, &copt, nil
 	}()
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
@@ -167,8 +172,8 @@ func (opts *ServerOptions) createJob(rw http.ResponseWriter, r *http.Request) {
 		QueueID   string    `json:"queue_id"`
 		Job       *work.Job `json:"job"`
 	}{
-		Namespace: namespace,
-		QueueID:   queueID,
+		Namespace: copt.Namespace,
+		QueueID:   copt.QueueID,
 		Job:       job,
 	})
 }
@@ -182,8 +187,9 @@ func (opts *ServerOptions) getMetrics(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
-	namespace := r.URL.Query().Get("namespace")
-	queueID := r.URL.Query().Get("queue_id")
+	query := r.URL.Query()
+	namespace := query.Get("namespace")
+	queueID := query.Get("queue_id")
 
 	metrics, err := queue.GetQueueMetrics(&work.QueueMetricsOptions{
 		Namespace: namespace,
