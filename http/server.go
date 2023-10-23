@@ -115,7 +115,7 @@ func (opts *ServerOptions) getJob(rw http.ResponseWriter, r *http.Request) {
 	})
 }
 
-type CreateJobOptions struct {
+type createJobOptions struct {
 	Namespace string          `json:"namespace"`
 	QueueID   string          `json:"queue_id"`
 	ID        string          `json:"id"`
@@ -124,8 +124,8 @@ type CreateJobOptions struct {
 }
 
 func (opts *ServerOptions) createJob(rw http.ResponseWriter, r *http.Request) {
-	job, copt, err := func() (*work.Job, *CreateJobOptions, error) {
-		var copt CreateJobOptions
+	job, copt, err := func() (*work.Job, *createJobOptions, error) {
+		var copt createJobOptions
 		err := json.NewDecoder(r.Body).Decode(&copt)
 		if err != nil {
 			return nil, nil, err
