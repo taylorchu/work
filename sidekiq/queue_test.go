@@ -545,3 +545,29 @@ func TestSidekiqQueueEnqueueDuplicated(t *testing.T) {
 	require.Equal(t, jobKey, z[0].Member)
 	require.EqualValues(t, job.EnqueuedAt.Unix()+60, z[0].Score)
 }
+
+func TestSidekiqQueueExternalBulkEnqueue(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewQueue(client)
+
+	const jobCount = 1000000
+	var jobs []*work.Job
+	for i := 0; i < jobCount; i++ {
+		job := work.NewJob()
+		err := job.MarshalJSONPayload([]int{1, 2, 3})
+		require.NoError(t, err)
+		jobs = append(jobs, job)
+	}
+
+	err := q.ExternalBulkEnqueue(jobs, &work.EnqueueOptions{
+		Namespace: "{sidekiq}",
+		QueueID:   "import/TestWorker",
+	})
+	require.NoError(t, err)
+
+	count, err := client.LLen(context.Background(), "{sidekiq}:queue:import").Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(jobCount), count)
+}

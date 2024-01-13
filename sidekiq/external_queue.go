@@ -8,29 +8,58 @@ import (
 	"github.com/taylorchu/work"
 )
 
+func batchSlice(n int) [][]int {
+	const size = 1000
+	var batches [][]int
+	for i := 0; i < n; i += size {
+		j := i + size
+		if j > n {
+			j = n
+		}
+		batches = append(batches, []int{i, j})
+	}
+	return batches
+}
+
 func (q *sidekiqQueue) ExternalEnqueue(job *work.Job, opt *work.EnqueueOptions) error {
 	return q.ExternalBulkEnqueue([]*work.Job{job}, opt)
 }
 
 func (q *sidekiqQueue) ExternalBulkEnqueue(jobs []*work.Job, opt *work.EnqueueOptions) error {
-	now := time.Now()
-	readyJobs := make([]*work.Job, 0, len(jobs))
-	scheduledJobs := make([]*work.Job, 0, len(jobs))
-	for _, job := range jobs {
-		if job.EnqueuedAt.After(now) {
-			scheduledJobs = append(scheduledJobs, job)
-		} else {
-			readyJobs = append(readyJobs, job)
+	for _, batch := range batchSlice(len(jobs)) {
+		err := q.externalBulkEnqueueSmallBatch(jobs[batch[0]:batch[1]], opt)
+		if err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
-	err := q.externalBulkEnqueue(readyJobs, opt)
-	if err != nil {
-		return err
-	}
-	err = q.externalBulkEnqueueIn(scheduledJobs, opt)
-	if err != nil {
-		return err
+func (q *sidekiqQueue) externalBulkEnqueueSmallBatch(jobs []*work.Job, opt *work.EnqueueOptions) error {
+	now := time.Now()
+	for _, enq := range []struct {
+		in          bool
+		enqueueFunc func([]*work.Job, *work.EnqueueOptions) error
+	}{
+		{
+			in:          true,
+			enqueueFunc: q.externalBulkEnqueueIn,
+		},
+		{
+			in:          false,
+			enqueueFunc: q.externalBulkEnqueue,
+		},
+	} {
+		var matchedJobs []*work.Job
+		for _, job := range jobs {
+			if enq.in == job.EnqueuedAt.After(now) {
+				matchedJobs = append(matchedJobs, job)
+			}
+		}
+		err := enq.enqueueFunc(matchedJobs, opt)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
