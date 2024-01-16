@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"time"
 
 	"github.com/taylorchu/work"
 )
@@ -81,23 +80,4 @@ func newSidekiqJob(job *work.Job, sqQueue, sqClass string) (*sidekiqJob, error) 
 		RetriedAt:    float64(retriedAt),
 	}
 	return &sqJob, nil
-}
-
-func newJob(sqJob *sidekiqJob) (*work.Job, error) {
-	updatedAt := sqJob.CreatedAt
-	for _, ts := range []float64{sqJob.FailedAt, sqJob.RetriedAt} {
-		if ts > updatedAt {
-			updatedAt = ts
-		}
-	}
-	job := work.Job{
-		ID:         sqJob.ID,
-		Payload:    sqJob.Args,
-		CreatedAt:  time.Unix(int64(sqJob.CreatedAt), 0),
-		UpdatedAt:  time.Unix(int64(updatedAt), 0),
-		EnqueuedAt: time.Unix(int64(sqJob.EnqueuedAt), 0),
-		Retries:    sqJob.RetryCount,
-		LastError:  sqJob.ErrorMessage,
-	}
-	return &job, nil
 }
