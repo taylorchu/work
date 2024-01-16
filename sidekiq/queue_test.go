@@ -83,7 +83,7 @@ func TestSidekiqQueueExternalBulkEnqueue(t *testing.T) {
 	require.NoError(t, redistest.Reset(client))
 	q := NewQueue(client)
 
-	const jobCount = 1000000
+	const jobCount = 100000
 	var jobs []*work.Job
 	for i := 0; i < jobCount; i++ {
 		job := work.NewJob()

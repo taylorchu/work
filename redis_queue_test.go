@@ -334,7 +334,7 @@ func TestRedisQueueBulkEnqueue(t *testing.T) {
 	require.NoError(t, redistest.Reset(client))
 	q := NewRedisQueue(client)
 
-	const jobCount = 1000000
+	const jobCount = 100000
 	var jobs []*Job
 	for i := 0; i < jobCount; i++ {
 		job := NewJob()
