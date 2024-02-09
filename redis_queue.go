@@ -10,6 +10,19 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func batchSlice(n int) [][]int {
+	const size = 1000
+	var batches [][]int
+	for i := 0; i < n; i += size {
+		j := i + size
+		if j > n {
+			j = n
+		}
+		batches = append(batches, []int{i, j})
+	}
+	return batches
+}
+
 type redisQueue struct {
 	client redis.UniversalClient
 
@@ -170,6 +183,16 @@ func (q *redisQueue) Enqueue(job *Job, opt *EnqueueOptions) error {
 }
 
 func (q *redisQueue) BulkEnqueue(jobs []*Job, opt *EnqueueOptions) error {
+	for _, batch := range batchSlice(len(jobs)) {
+		err := q.bulkEnqueueSmallBatch(jobs[batch[0]:batch[1]], opt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (q *redisQueue) bulkEnqueueSmallBatch(jobs []*Job, opt *EnqueueOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
@@ -201,6 +224,18 @@ func (q *redisQueue) Dequeue(opt *DequeueOptions) (*Job, error) {
 }
 
 func (q *redisQueue) BulkDequeue(count int64, opt *DequeueOptions) ([]*Job, error) {
+	var jobs []*Job
+	for _, batch := range batchSlice(int(count)) {
+		foundJobs, err := q.bulkDequeueSmallBatch(int64(batch[1]-batch[0]), opt)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, foundJobs...)
+	}
+	return jobs, nil
+}
+
+func (q *redisQueue) bulkDequeueSmallBatch(count int64, opt *DequeueOptions) ([]*Job, error) {
 	err := opt.Validate()
 	if err != nil {
 		return nil, err
@@ -236,6 +271,16 @@ func (q *redisQueue) Ack(job *Job, opt *AckOptions) error {
 }
 
 func (q *redisQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
+	for _, batch := range batchSlice(len(jobs)) {
+		err := q.bulkAckSmallBatch(jobs[batch[0]:batch[1]], opt)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (q *redisQueue) bulkAckSmallBatch(jobs []*Job, opt *AckOptions) error {
 	err := opt.Validate()
 	if err != nil {
 		return err
@@ -253,6 +298,18 @@ func (q *redisQueue) BulkAck(jobs []*Job, opt *AckOptions) error {
 }
 
 func (q *redisQueue) BulkFind(jobIDs []string, opt *FindOptions) ([]*Job, error) {
+	var jobs []*Job
+	for _, batch := range batchSlice(len(jobIDs)) {
+		foundJobs, err := q.bulkFindSmallBatch(jobIDs[batch[0]:batch[1]], opt)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, foundJobs...)
+	}
+	return jobs, nil
+}
+
+func (q *redisQueue) bulkFindSmallBatch(jobIDs []string, opt *FindOptions) ([]*Job, error) {
 	err := opt.Validate()
 	if err != nil {
 		return nil, err

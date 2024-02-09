@@ -327,3 +327,27 @@ func TestRedisQueueGetQueueMetrics(t *testing.T) {
 	require.EqualValues(t, 1, m.ScheduledTotal)
 	require.True(t, m.Latency == 0)
 }
+
+func TestRedisQueueBulkEnqueue(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewRedisQueue(client)
+
+	const jobCount = 100000
+	var jobs []*Job
+	for i := 0; i < jobCount; i++ {
+		job := NewJob()
+		jobs = append(jobs, job)
+	}
+
+	err := q.BulkEnqueue(jobs, &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "q1",
+	})
+	require.NoError(t, err)
+
+	count, err := client.ZCard(context.Background(), "{ns1}:queue:q1").Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(jobCount), count)
+}
