@@ -64,7 +64,7 @@ func NewRedisQueue(client redis.UniversalClient) RedisQueue {
 		table.insert(zadd_args, at)
 		table.insert(zadd_args, job_key)
 	end
-	return redis.call("zadd", queue_key, unpack(zadd_args))
+	return redis.call("zadd", queue_key, "gt", unpack(zadd_args))
 	`)
 
 	dequeueScript := redis.NewScript(`
