@@ -85,7 +85,7 @@ workflows:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
-                - eqalpha/keydb
+                - docker.dragonflydb.io/dragonflydb/dragonfly
       - redis-cluster:
           matrix:
             parameters:
@@ -96,5 +96,5 @@ workflows:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
-                - eqalpha/keydb
+                - docker.dragonflydb.io/dragonflydb/dragonfly
       - fossa
