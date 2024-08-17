@@ -31,8 +31,6 @@ jobs:
           - GO111MODULE=on
           - REDIS_ADDR=:7000,:7001,:7002
       - image: << parameters.redis-image >>
-        environment:
-          - DFLY_default_lua_flags=allow-undeclared-keys
         command:
           - --cluster-enabled
           - "yes"
@@ -41,8 +39,6 @@ jobs:
           - --cluster-config-file
           - 7000.conf
       - image: << parameters.redis-image >>
-        environment:
-          - DFLY_default_lua_flags=allow-undeclared-keys
         command:
           - --cluster-enabled
           - "yes"
@@ -51,8 +47,6 @@ jobs:
           - --cluster-config-file
           - 7001.conf
       - image: << parameters.redis-image >>
-        environment:
-          - DFLY_default_lua_flags=allow-undeclared-keys
         command:
           - --cluster-enabled
           - "yes"
@@ -104,5 +98,4 @@ workflows:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
-                - docker.dragonflydb.io/dragonflydb/dragonfly
       - fossa
