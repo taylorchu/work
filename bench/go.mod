@@ -1,6 +1,6 @@
 module github.com/taylorchu/work/bench
 
-go 1.23
+go 1.22
 
 require (
 	github.com/gocraft/work v0.5.2-0.20180912175354-c85b71e20062
