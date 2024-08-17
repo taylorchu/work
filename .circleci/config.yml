@@ -12,7 +12,7 @@ jobs:
           - GO111MODULE=on
       - image: << parameters.redis-image >>
         environment:
-          - DFLY_DEFAULT_LUA_FLAGS=allow-undeclared-keys
+          - DFLY_default_lua_flags=allow-undeclared-keys
     steps:
       - checkout
       - run: go install honnef.co/go/tools/cmd/staticcheck@latest
@@ -32,7 +32,7 @@ jobs:
           - REDIS_ADDR=:7000,:7001,:7002
       - image: << parameters.redis-image >>
         environment:
-          - DFLY_DEFAULT_LUA_FLAGS=allow-undeclared-keys
+          - DFLY_default_lua_flags=allow-undeclared-keys
         command:
           - --cluster-enabled
           - "yes"
@@ -42,7 +42,7 @@ jobs:
           - 7000.conf
       - image: << parameters.redis-image >>
         environment:
-          - DFLY_DEFAULT_LUA_FLAGS=allow-undeclared-keys
+          - DFLY_default_lua_flags=allow-undeclared-keys
         command:
           - --cluster-enabled
           - "yes"
@@ -52,7 +52,7 @@ jobs:
           - 7001.conf
       - image: << parameters.redis-image >>
         environment:
-          - DFLY_DEFAULT_LUA_FLAGS=allow-undeclared-keys
+          - DFLY_default_lua_flags=allow-undeclared-keys
         command:
           - --cluster-enabled
           - "yes"
