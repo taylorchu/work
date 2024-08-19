@@ -157,8 +157,8 @@ func (w *Worker) RunOnce(ctx context.Context, queueID string, h ContextHandleFun
 	}
 
 	handle := func(job *Job, o *DequeueOptions) error {
-		ctx, cancel := context.WithTimeout(ctx, opt.MaxExecutionTime)
-		defer cancel()
+		//ctx, cancel := context.WithTimeout(ctx, opt.MaxExecutionTime)
+		//defer cancel()
 		return h(ctx, job, o)
 	}
 	for _, mw := range opt.HandleMiddleware {
