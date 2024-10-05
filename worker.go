@@ -240,16 +240,22 @@ func (w *Worker) start(ctx context.Context, h handler) {
 			return
 		default:
 			err := w.RunOnce(ctx, h.QueueID, h.HandleFunc, opt)
-			if err != nil {
-				var wrappedError *wrappedHandlerError
-				if errors.As(err, &wrappedError) {
-				} else if errors.Is(err, ErrEmptyQueue) {
-				} else {
-					errFunc(err)
-				}
+			if err != nil && !allowedError(err) {
+				errFunc(err)
 			}
 		}
 	}
+}
+
+func allowedError(err error) bool {
+	var wrappedError *wrappedHandlerError
+	if errors.As(err, &wrappedError) {
+		return true
+	}
+	if errors.Is(err, ErrEmptyQueue) {
+		return true
+	}
+	return false
 }
 
 // ExportMetrics dumps queue stats if the queue implements MetricsExporter.
