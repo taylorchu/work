@@ -1,22 +1,5 @@
 version: 2.1
 jobs:
-  redis:
-    parameters:
-      redis-image:
-        type: string
-      go-image:
-        type: string
-    docker:
-      - image: << parameters.go-image >>
-        environment:
-          - GO111MODULE=on
-      - image: << parameters.redis-image >>
-    steps:
-      - checkout
-      - run: go install honnef.co/go/tools/cmd/staticcheck@latest
-      - run: staticcheck -checks all,-ST1000 ./...
-      - run: dockerize -wait tcp://:6379
-      - run: go test -p 1 -v ./...
   redis-cluster:
     parameters:
       redis-image:
@@ -75,18 +58,6 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      - redis:
-          matrix:
-            parameters:
-              go-image:
-                - cimg/go:1.21
-                - cimg/go:1.22
-              redis-image:
-                - redis:5-alpine
-                - redis:6-alpine
-                - redis:7-alpine
-                - valkey/valkey:7-alpine
-                - valkey/valkey:8.0-alpine
       - redis-cluster:
           matrix:
             parameters:
