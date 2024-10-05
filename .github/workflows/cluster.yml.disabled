@@ -1,0 +1,85 @@
+# disable workflow until we have a cluster working
+# this file is a WIP
+'on':
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+  workflow_dispatch: null
+name: ci
+jobs:
+  redis-cluster:
+    strategy:
+      matrix:
+        go-version:
+          - 1.21.x
+          - 1.22.x
+          - 1.23.x
+        redis-image:
+          - redis/redis-stack-server:7.4.0-v1
+          - valkey/valkey:7-alpine
+          - valkey/valkey:8.0-alpine
+    runs-on: 'ubuntu-latest'
+    services:
+      redis-1:
+        image: ${{ matrix.redis-image }}
+        ports:
+          - "7003:7003"
+          - "17003:17003"
+        options: >-
+          --health-cmd "redis-cli -p 7003 ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          VALKEY_EXTRA_FLAGS: "--cluster-enabled yes --port 7003 --cluster-config-file 7003.conf --protected-mode no --cluster-announce-ip 127.0.0.1 --cluster-announce-hostname localhost"
+          REDIS_ARGS: "--cluster-enabled yes --port 7003 --cluster-config-file 7003.conf --protected-mode no --cluster-announce-ip 127.0.0.1 --cluster-announce-hostname localhost"
+      redis-2:
+        image: ${{ matrix.redis-image }}
+        ports:
+        - "7001:7001"
+        - "17001:17001"
+        options: >-
+          --health-cmd "redis-cli -p 7001 ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          VALKEY_EXTRA_FLAGS: "--cluster-enabled yes --port 7001 --cluster-config-file 7001.conf --protected-mode no --cluster-announce-ip 127.0.0.1 --cluster-announce-hostname localhost"
+          REDIS_ARGS: "--cluster-enabled yes --port 7001 --cluster-config-file 7001.conf --protected-mode no --cluster-announce-ip 127.0.0.1 --cluster-announce-hostname localhost"
+      redis-3:
+        image: ${{ matrix.redis-image }}
+        ports:
+          - "7002:7002"
+          - "17002:17002"
+        options: >-
+          --health-cmd "redis-cli -p 7002 ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          VALKEY_EXTRA_FLAGS: "--cluster-enabled yes --port 7002 --cluster-config-file 7002.conf --protected-mode no --cluster-announce-ip 127.0.0.1 --cluster-announce-hostname localhost"
+          REDIS_ARGS: "--cluster-enabled yes --port 7002 --cluster-config-file 7002.conf --protected-mode no --cluster-announce-ip 127.0.0.1 --cluster-announce-hostname localhost"
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '${{ matrix.go-version }}'
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck -checks all,-ST1000 ./...
+      - name: create redis cluster
+        run: |
+          sudo apt update -y
+          sudo apt install -y redis-tools
+          redis-cli --cluster-yes --cluster create 127.0.0.1:7003 127.0.0.1:7001 127.0.0.1:7002 --cluster-replicas 0 --verbose
+          sleep 10
+      - name: run tests
+        env:
+          REDIS_ADDR: ":7003,:7001,:7002"
+        run: |
+          go test -p 1 -v ./...

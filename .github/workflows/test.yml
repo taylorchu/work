@@ -1,0 +1,41 @@
+'on':
+  push:
+    branches:
+      - master
+      - main
+      - switch-to-github-actions
+  pull_request:
+  workflow_dispatch: null
+name: ci
+jobs:
+  redis:
+    strategy:
+      matrix:
+        go-version:
+          - 1.21.x
+          - 1.22.x
+          - 1.23.x
+        redis-image:
+          - redis/redis-stack-server:6.2.6-v17
+          - redis/redis-stack-server:7.4.0-v1
+          - valkey/valkey:7-alpine
+          - valkey/valkey:8.0-alpine
+    runs-on: 'ubuntu-latest'
+    services:
+      redis:
+        image: ${{ matrix.redis-image }}
+        ports:
+          - "6379:6379"
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '${{ matrix.go-version }}'
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck -checks all,-ST1000 ./...
+      - name: Test
+        run: go test -p 1 -v ./...
