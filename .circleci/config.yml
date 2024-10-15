@@ -11,6 +11,8 @@ jobs:
         environment:
           - GO111MODULE=on
       - image: << parameters.redis-image >>
+        environment:
+          - DFLY_default_lua_flags=allow-undeclared-keys
     steps:
       - checkout
       - run: go install honnef.co/go/tools/cmd/staticcheck@latest
@@ -79,22 +81,21 @@ workflows:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.19
-                - cimg/go:1.20
+                - cimg/go:1.21
+                - cimg/go:1.22
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
-                - eqalpha/keydb
+                - docker.dragonflydb.io/dragonflydb/dragonfly
       - redis-cluster:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.19
-                - cimg/go:1.20
+                - cimg/go:1.21
+                - cimg/go:1.22
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
-                - eqalpha/keydb
       - fossa
