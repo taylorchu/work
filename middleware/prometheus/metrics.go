@@ -8,6 +8,15 @@ import (
 )
 
 var (
+	jobLifeTimeSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "work",
+			Name:      "job_life_time_seconds",
+			Help:      "Time from a job is created to it is finished",
+			Buckets:   []float64{1, 10, 60},
+		},
+		[]string{"namespace", "queue"},
+	)
 	jobExecutionTimeSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "work",
@@ -71,6 +80,7 @@ var (
 // RegisterMetrics adds all metrics to a prometheus registry.
 func RegisterMetrics(r prometheus.Registerer) error {
 	for _, m := range []prometheus.Collector{
+		jobLifeTimeSeconds,
 		jobExecutionTimeSeconds,
 		jobExecutedTotal,
 		jobBusy,
@@ -100,6 +110,7 @@ func HandleFuncMetrics(f work.HandleFunc) work.HandleFunc {
 		}
 		jobExecutedTotal.WithLabelValues(opt.Namespace, opt.QueueID, "success").Inc()
 		jobExecutionTimeSeconds.WithLabelValues(opt.Namespace, opt.QueueID).Observe(time.Since(startTime).Seconds())
+		jobLifeTimeSeconds.WithLabelValues(opt.Namespace, opt.QueueID).Observe(time.Since(job.CreatedAt).Seconds())
 		return nil
 	}
 }
