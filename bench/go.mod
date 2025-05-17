@@ -1,13 +1,13 @@
 module github.com/taylorchu/work/bench
 
-go 1.22
+go 1.24
 
 require (
 	github.com/gocraft/work v0.5.2-0.20180912175354-c85b71e20062
 	github.com/gomodule/redigo v1.9.2
-	github.com/redis/go-redis/v9 v9.6.1
-	github.com/stretchr/testify v1.9.0
-	github.com/taylorchu/work v0.3.1-0.20240817015620-387e15513c84
+	github.com/redis/go-redis/v9 v9.7.3
+	github.com/stretchr/testify v1.10.0
+	github.com/taylorchu/work v0.3.2-0.20250517170805-408778c1c05c
 )
 
 require (
