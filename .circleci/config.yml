@@ -79,7 +79,6 @@ workflows:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.23
                 - cimg/go:1.24
               redis-image:
                 - redis:5-alpine
@@ -91,7 +90,6 @@ workflows:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.23
                 - cimg/go:1.24
               redis-image:
                 - redis:5-alpine
