@@ -79,24 +79,24 @@ workflows:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.21
-                - cimg/go:1.22
+                - cimg/go:1.23
+                - cimg/go:1.24
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
                 - valkey/valkey:7-alpine
-                - valkey/valkey:8.0-alpine
+                - valkey/valkey:8-alpine
       - redis-cluster:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.21
-                - cimg/go:1.22
+                - cimg/go:1.23
+                - cimg/go:1.24
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
                 - valkey/valkey:7-alpine
-                - valkey/valkey:8.0-alpine
+                - valkey/valkey:8-alpine
       - fossa
