@@ -13,7 +13,7 @@ jobs:
       - image: << parameters.redis-image >>
     steps:
       - checkout
-      - run: go install honnef.co/go/tools/cmd/staticcheck@latest
+      - run: go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
       - run: staticcheck -checks all,-ST1000 ./...
       - run: dockerize -wait tcp://:6379
       - run: go test -p 1 -v ./...
@@ -54,7 +54,7 @@ jobs:
           - 7002.conf
     steps:
       - checkout
-      - run: go install honnef.co/go/tools/cmd/staticcheck@latest
+      - run: go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
       - run: staticcheck -checks all,-ST1000 ./...
       - run: dockerize -wait tcp://:7000 -wait tcp://:7001 -wait tcp://:7002
       - run: sudo apt-get update && sudo apt-get install redis-tools
@@ -79,24 +79,22 @@ workflows:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.21
-                - cimg/go:1.22
+                - cimg/go:1.24
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
                 - valkey/valkey:7-alpine
-                - valkey/valkey:8.0-alpine
+                - valkey/valkey:8-alpine
       - redis-cluster:
           matrix:
             parameters:
               go-image:
-                - cimg/go:1.21
-                - cimg/go:1.22
+                - cimg/go:1.24
               redis-image:
                 - redis:5-alpine
                 - redis:6-alpine
                 - redis:7-alpine
                 - valkey/valkey:7-alpine
-                - valkey/valkey:8.0-alpine
+                - valkey/valkey:8-alpine
       - fossa
