@@ -240,3 +240,20 @@ func (opt *FindOptions) Validate() error {
 type BulkJobFinder interface {
 	BulkFind(jobIDs []string, opts *FindOptions) ([]*Job, error)
 }
+
+// PromoteOptions specifies how a job is promoted in the queue.
+type PromoteOptions struct {
+	Namespace string
+	QueueID   string
+}
+
+// Validate validates PromoteOptions.
+func (opt *PromoteOptions) Validate() error {
+	if opt.Namespace == "" {
+		return ErrEmptyNamespace
+	}
+	if opt.QueueID == "" {
+		return ErrEmptyQueueID
+	}
+	return nil
+}

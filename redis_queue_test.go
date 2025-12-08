@@ -351,3 +351,108 @@ func TestRedisQueueBulkEnqueue(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(jobCount), count)
 }
+
+func TestRedisQueuePromoteJob(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewRedisQueue(client)
+
+	// Enqueue two jobs with old timestamps (in the past)
+	job1 := NewJob()
+	job1.EnqueuedAt = time.Now().Add(-time.Hour) // 1 hour ago
+	job2 := NewJob()
+	job2.EnqueuedAt = time.Now().Add(-time.Hour) // 1 hour ago
+
+	opts := &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "q1",
+	}
+
+	err := q.Enqueue(job1, opts)
+	require.NoError(t, err)
+	err = q.Enqueue(job2, opts)
+	require.NoError(t, err)
+
+	// Check initial score of job2 (should be old timestamp)
+	queueKey := "{ns1}:queue:q1"
+	jobKey := fmt.Sprintf("{ns1}:job:%s", job2.ID)
+	initialScore, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, float64(job2.EnqueuedAt.Unix()), initialScore)
+
+	// Promote job2
+	beforePromote := time.Now().Unix()
+	err = q.PromoteJob(job2.ID, &PromoteOptions{
+		Namespace: opts.Namespace,
+		QueueID:   opts.QueueID,
+	})
+	require.NoError(t, err)
+	afterPromote := time.Now().Unix()
+
+	// Check that job2's score was updated to now
+	newScore, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, int64(newScore), beforePromote)
+	require.LessOrEqual(t, int64(newScore), afterPromote)
+
+	// Promote non-existent job should not error (XX flag prevents adding)
+	err = q.PromoteJob("non-existent-job", &PromoteOptions{
+		Namespace: opts.Namespace,
+		QueueID:   opts.QueueID,
+	})
+	require.NoError(t, err)
+
+	// Verify non-existent job was not added to queue
+	exists, err := client.ZScore(context.Background(), queueKey, "{ns1}:job:non-existent-job").Result()
+	require.Error(t, err) // redis.Nil error expected
+	require.Equal(t, float64(0), exists)
+}
+
+func TestRedisQueuePromoteJobDoesNotDemote(t *testing.T) {
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewRedisQueue(client)
+
+	// Enqueue a job
+	job := NewJob()
+	job.EnqueuedAt = time.Now()
+
+	opts := &EnqueueOptions{
+		Namespace: "{ns1}",
+		QueueID:   "q1",
+	}
+
+	err := q.Enqueue(job, opts)
+	require.NoError(t, err)
+
+	// Dequeue the job (this sets score to now + invisibleSec)
+	dequeueOpts := &DequeueOptions{
+		Namespace:    "{ns1}",
+		QueueID:      "q1",
+		At:           time.Now(),
+		InvisibleSec: 60, // 60 seconds
+	}
+	dequeuedJob, err := q.Dequeue(dequeueOpts)
+	require.NoError(t, err)
+	require.Equal(t, job.ID, dequeuedJob.ID)
+
+	// Check that job's score is now + invisibleSec
+	queueKey := "{ns1}:queue:q1"
+	jobKey := fmt.Sprintf("{ns1}:job:%s", job.ID)
+	scoreAfterDequeue, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+
+	// Try to promote the job (should not demote it because of GT flag)
+	err = q.PromoteJob(job.ID, &PromoteOptions{
+		Namespace: opts.Namespace,
+		QueueID:   opts.QueueID,
+	})
+	require.NoError(t, err)
+
+	// Verify score hasn't changed (GT flag prevented demotion)
+	scoreAfterPromote, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, scoreAfterDequeue, scoreAfterPromote)
+}

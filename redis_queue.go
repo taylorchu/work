@@ -33,6 +33,14 @@ type redisQueue struct {
 	metricScript  *redis.Script
 }
 
+// JobPromoter can update a job's score in the queue to make it immediately
+// eligible for dequeuing without re-enqueuing the entire job.
+type JobPromoter interface {
+	// PromoteJob updates the job's score to time.Now(). Only affects jobs
+	// that exist and have scores <= now (won't demote jobs being processed).
+	PromoteJob(jobID string, opt *PromoteOptions) error
+}
+
 // RedisQueue implements Queue with other additional capabilities
 type RedisQueue interface {
 	Queue
@@ -40,6 +48,7 @@ type RedisQueue interface {
 	BulkDequeuer
 	BulkJobFinder
 	MetricsExporter
+	JobPromoter
 }
 
 // NewRedisQueue creates a new queue stored in redis.
@@ -340,6 +349,37 @@ func (q *redisQueue) bulkFindSmallBatch(jobIDs []string, opt *FindOptions) ([]*J
 		}
 	}
 	return jobs, nil
+}
+
+func (q *redisQueue) PromoteJob(jobID string, opt *PromoteOptions) error {
+	err := opt.Validate()
+	if err != nil {
+		return err
+	}
+
+	queueKey := opt.Namespace + ":queue:" + opt.QueueID
+	jobKey := opt.Namespace + ":job:" + jobID
+
+	// ZADD with both XX and GT flags:
+	// - XX: Only update existing members (don't resurrect completed jobs)
+	// - GT: Only update if new score > current score (don't demote processing jobs)
+	//
+	// Safety guarantees:
+	// 1. If job was completed and removed: XX prevents re-adding it
+	// 2. If job is being processed (score = now + invisibleSec): GT prevents demotion
+	// 3. If job is pending (score <= now): Both flags allow promotion
+	return q.client.ZAddArgs(
+		context.Background(),
+		queueKey,
+		redis.ZAddArgs{
+			XX: true, // Only update existing
+			GT: true, // Only if new score is greater
+			Members: []redis.Z{{
+				Score:  float64(time.Now().Unix()),
+				Member: jobKey,
+			}},
+		},
+	).Err()
 }
 
 func (q *redisQueue) GetQueueMetrics(opt *QueueMetricsOptions) (*QueueMetrics, error) {
