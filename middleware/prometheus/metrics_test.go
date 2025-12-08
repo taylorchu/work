@@ -42,6 +42,7 @@ func TestHandleFuncMetrics(t *testing.T) {
 
 	t.Log(r.Body.String())
 	for _, m := range []string{
+		`work_job_life_time_seconds_bucket{`,
 		`work_job_executed_total{`,
 		`work_job_execution_time_seconds_bucket{`,
 		`work_job_busy{`,
