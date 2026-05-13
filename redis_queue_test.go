@@ -409,6 +409,148 @@ func TestRedisQueuePromoteJob(t *testing.T) {
 	require.Equal(t, float64(0), exists)
 }
 
+func TestRedisQueueEnqueueGuardDoesNotDemote(t *testing.T) {
+	// AllowPromotion defaults to false. A second Enqueue of the same job
+	// with an earlier score must be a no-op so deterministic-ID dedup
+	// jobs cannot have their deferred run time clobbered.
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewRedisQueue(client)
+
+	opts := &EnqueueOptions{Namespace: "{ns1}", QueueID: "q1"}
+
+	job := NewJob()
+	deferredAt := time.Now().Add(time.Minute)
+	job.EnqueuedAt = deferredAt
+	require.NoError(t, q.Enqueue(job, opts))
+
+	queueKey := "{ns1}:queue:q1"
+	jobKey := fmt.Sprintf("{ns1}:job:%s", job.ID)
+	scoreAfterFirst, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+	require.EqualValues(t, deferredAt.Unix(), scoreAfterFirst)
+
+	// Re-enqueue the same ID with an earlier score (the dedup pattern).
+	job.EnqueuedAt = time.Now()
+	require.NoError(t, q.Enqueue(job, opts))
+
+	scoreAfterSecond, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, scoreAfterFirst, scoreAfterSecond, "GT must reject the earlier-score re-enqueue when AllowPromotion is false")
+}
+
+func TestRedisQueueEnqueueAllowPromotionDemotes(t *testing.T) {
+	// AllowPromotion=true opts the job out of the GT guard so the worker
+	// retry path can lower the score from the Dequeue InvisibleSec mark
+	// back down to now + backoff.
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewRedisQueue(client)
+
+	opts := &EnqueueOptions{Namespace: "{ns1}", QueueID: "q1"}
+
+	job := NewJob()
+	job.AllowPromotion = true
+	deferredAt := time.Now().Add(time.Minute)
+	job.EnqueuedAt = deferredAt
+	require.NoError(t, q.Enqueue(job, opts))
+
+	queueKey := "{ns1}:queue:q1"
+	jobKey := fmt.Sprintf("{ns1}:job:%s", job.ID)
+
+	// Re-enqueue the same ID with an earlier score.
+	earlierAt := time.Now()
+	job.EnqueuedAt = earlierAt
+	require.NoError(t, q.Enqueue(job, opts))
+
+	scoreAfter, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+	require.EqualValues(t, earlierAt.Unix(), scoreAfter, "plain ZADD must lower the score when AllowPromotion is true")
+}
+
+func TestRedisQueueBulkEnqueueMixedAllowPromotion(t *testing.T) {
+	// A single BulkEnqueue containing both guarded (AllowPromotion=false)
+	// and promotable (AllowPromotion=true) jobs must apply the right
+	// semantic to each, atomically.
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewRedisQueue(client)
+
+	opts := &EnqueueOptions{Namespace: "{ns1}", QueueID: "q1"}
+
+	guarded := NewJob()
+	deferredAt := time.Now().Add(time.Minute)
+	guarded.EnqueuedAt = deferredAt
+
+	promotable := NewJob()
+	promotable.AllowPromotion = true
+	promotable.EnqueuedAt = deferredAt
+
+	require.NoError(t, q.BulkEnqueue([]*Job{guarded, promotable}, opts))
+
+	// Re-enqueue both with an earlier score.
+	earlierAt := time.Now()
+	guarded.EnqueuedAt = earlierAt
+	promotable.EnqueuedAt = earlierAt
+	require.NoError(t, q.BulkEnqueue([]*Job{guarded, promotable}, opts))
+
+	queueKey := "{ns1}:queue:q1"
+
+	guardedScore, err := client.ZScore(context.Background(), queueKey, fmt.Sprintf("{ns1}:job:%s", guarded.ID)).Result()
+	require.NoError(t, err)
+	require.EqualValues(t, deferredAt.Unix(), guardedScore, "guarded job must retain its later score")
+
+	promotableScore, err := client.ZScore(context.Background(), queueKey, fmt.Sprintf("{ns1}:job:%s", promotable.ID)).Result()
+	require.NoError(t, err)
+	require.EqualValues(t, earlierAt.Unix(), promotableScore, "promotable job must accept the earlier score")
+}
+
+func TestRedisQueuePromoteJobAllowPromotionDemotes(t *testing.T) {
+	// PromoteJob on a job with AllowPromotion=true must be able to advance
+	// the score even when the job is currently sitting at the InvisibleSec
+	// mark from a prior Dequeue — that is precisely the state the subqueue
+	// PromoteOnAck path needs to advance.
+	client := redistest.NewClient()
+	defer client.Close()
+	require.NoError(t, redistest.Reset(client))
+	q := NewRedisQueue(client)
+
+	opts := &EnqueueOptions{Namespace: "{ns1}", QueueID: "q1"}
+
+	job := NewJob()
+	job.AllowPromotion = true
+	job.EnqueuedAt = time.Now()
+	require.NoError(t, q.Enqueue(job, opts))
+
+	dequeued, err := q.Dequeue(&DequeueOptions{
+		Namespace:    "{ns1}",
+		QueueID:      "q1",
+		At:           time.Now(),
+		InvisibleSec: 60,
+	})
+	require.NoError(t, err)
+	require.Equal(t, job.ID, dequeued.ID)
+
+	queueKey := "{ns1}:queue:q1"
+	jobKey := fmt.Sprintf("{ns1}:job:%s", job.ID)
+	scoreAfterDequeue, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+
+	beforePromote := time.Now().Unix()
+	require.NoError(t, q.PromoteJob(job.ID, &PromoteOptions{
+		Namespace: opts.Namespace,
+		QueueID:   opts.QueueID,
+	}))
+
+	scoreAfterPromote, err := client.ZScore(context.Background(), queueKey, jobKey).Result()
+	require.NoError(t, err)
+	require.Less(t, int64(scoreAfterPromote), int64(scoreAfterDequeue), "PromoteJob must lower the score for AllowPromotion=true jobs")
+	require.GreaterOrEqual(t, int64(scoreAfterPromote), beforePromote)
+}
+
 func TestRedisQueuePromoteJobDoesNotDemote(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()

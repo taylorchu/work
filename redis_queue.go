@@ -58,22 +58,41 @@ func NewRedisQueue(client redis.UniversalClient) RedisQueue {
 	local queue_id = ARGV[2]
 	local queue_key = table.concat({ns, "queue", queue_id}, ":")
 
-	local zadd_args = {}
+	-- Per-job AllowPromotion (passed alongside each job) selects between
+	-- two ZADD variants. Guarded entries use ZADD ... gt so a duplicate
+	-- enqueue cannot demote an already-deferred deterministic-ID job;
+	-- promoted entries use plain ZADD so worker retry backoff can lower
+	-- the score below the InvisibleSec mark set by Dequeue.
+	local guarded_args = {}
+	local promoted_args = {}
 
-	for i = 3,table.getn(ARGV),3 do
+	for i = 3,table.getn(ARGV),4 do
 		local at = tonumber(ARGV[i])
-		local job_id = ARGV[i+1]
-		local jobm = ARGV[i+2]
+		local allow_promotion = ARGV[i+1]
+		local job_id = ARGV[i+2]
+		local jobm = ARGV[i+3]
 		local job_key = table.concat({ns, "job", job_id}, ":")
 
 		-- update job fields
 		redis.call("hset", job_key, "msgpack", jobm)
 
-		-- enqueue
-		table.insert(zadd_args, at)
-		table.insert(zadd_args, job_key)
+		if allow_promotion == "1" then
+			table.insert(promoted_args, at)
+			table.insert(promoted_args, job_key)
+		else
+			table.insert(guarded_args, at)
+			table.insert(guarded_args, job_key)
+		end
 	end
-	return redis.call("zadd", queue_key, "gt", unpack(zadd_args))
+
+	local added = 0
+	if table.getn(guarded_args) > 0 then
+		added = added + tonumber(redis.call("zadd", queue_key, "gt", unpack(guarded_args)))
+	end
+	if table.getn(promoted_args) > 0 then
+		added = added + tonumber(redis.call("zadd", queue_key, unpack(promoted_args)))
+	end
+	return added
 	`)
 
 	dequeueScript := redis.NewScript(`
@@ -209,7 +228,7 @@ func (q *redisQueue) bulkEnqueueSmallBatch(jobs []*Job, opt *EnqueueOptions) err
 	if len(jobs) == 0 {
 		return nil
 	}
-	args := make([]interface{}, 2+3*len(jobs))
+	args := make([]interface{}, 2+4*len(jobs))
 	args[0] = opt.Namespace
 	args[1] = opt.QueueID
 	for i, job := range jobs {
@@ -217,9 +236,14 @@ func (q *redisQueue) bulkEnqueueSmallBatch(jobs []*Job, opt *EnqueueOptions) err
 		if err != nil {
 			return err
 		}
-		args[2+3*i] = job.EnqueuedAt.Unix()
-		args[2+3*i+1] = job.ID
-		args[2+3*i+2] = jobm
+		args[2+4*i] = job.EnqueuedAt.Unix()
+		if job.AllowPromotion {
+			args[2+4*i+1] = "1"
+		} else {
+			args[2+4*i+1] = "0"
+		}
+		args[2+4*i+2] = job.ID
+		args[2+4*i+3] = jobm
 	}
 	return q.enqueueScript.Run(context.Background(), q.client, []string{opt.Namespace}, args...).Err()
 }
@@ -360,20 +384,40 @@ func (q *redisQueue) PromoteJob(jobID string, opt *PromoteOptions) error {
 	queueKey := opt.Namespace + ":queue:" + opt.QueueID
 	jobKey := opt.Namespace + ":job:" + jobID
 
-	// ZADD with both XX and GT flags:
-	// - XX: Only update existing members (don't resurrect completed jobs)
-	// - GT: Only update if new score > current score (don't demote processing jobs)
+	// Look up the job's AllowPromotion flag so PromoteJob honors the same
+	// per-job semantic as Enqueue. With AllowPromotion=false (default),
+	// PromoteJob keeps the GT guard and is effectively a no-op for any
+	// job whose score sits in the future (either deferred via dedup or
+	// in-flight via Dequeue's InvisibleSec mark). With AllowPromotion=true,
+	// the caller has asserted that the job's calling pattern is safe to
+	// demote — the typical use case is a subqueue handler middleware that
+	// promotes the next gated job after the prior handler Acks.
 	//
-	// Safety guarantees:
-	// 1. If job was completed and removed: XX prevents re-adding it
-	// 2. If job is being processed (score = now + invisibleSec): GT prevents demotion
-	// 3. If job is pending (score <= now): Both flags allow promotion
+	// If the job is no longer stored (already Ack'd or never enqueued),
+	// the XX flag below would prevent (re-)adding it anyway, so a missing
+	// hash is treated as a no-op rather than an error.
+	jobm, err := q.client.HGet(context.Background(), jobKey, "msgpack").Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil
+		}
+		return err
+	}
+	var job Job
+	if err := unmarshal(strings.NewReader(jobm), &job); err != nil {
+		return err
+	}
+
+	// XX always: do not resurrect a job whose hash exists but was removed
+	// from the queue ZSET (e.g. after an Ack race) — and never add a
+	// member that doesn't already exist. GT only when the job did not
+	// opt into promotion.
 	return q.client.ZAddArgs(
 		context.Background(),
 		queueKey,
 		redis.ZAddArgs{
-			XX: true, // Only update existing
-			GT: true, // Only if new score is greater
+			XX: true,
+			GT: !job.AllowPromotion,
 			Members: []redis.Z{{
 				Score:  float64(time.Now().Unix()),
 				Member: jobKey,

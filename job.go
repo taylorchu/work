@@ -30,6 +30,25 @@ type Job struct {
 	Retries int64 `msgpack:"retries"`
 	// If the job previously fails, LastError will be populated with error string.
 	LastError string `msgpack:"last_error"`
+
+	// AllowPromotion controls whether Enqueue and PromoteJob may lower this
+	// job's score.
+	//
+	// When false (default), both operations use ZADD XX GT semantics: once a
+	// job is scheduled at time T, a subsequent Enqueue with score T' < T is
+	// a no-op, and PromoteJob cannot reduce the score. This preserves the
+	// "deferral" guarantee relied on by deterministic-ID jobs that may be
+	// enqueued multiple times concurrently (a dedup pattern) and prevents
+	// PromoteJob from demoting a job whose score has been bumped to
+	// now + InvisibleSec by Dequeue.
+	//
+	// When true, both operations use ZADD XX (no GT). Backoff-based
+	// rescheduling from the worker retry path may then lower the score so
+	// the configured Backoff actually takes effect, and PromoteJob may
+	// advance a scheduled-but-pending job to now. The caller is responsible
+	// for ensuring this is safe — typically that the job has a unique ID
+	// and is not relied on for dedup-deferral.
+	AllowPromotion bool `msgpack:"allow_promotion,omitempty" json:",omitempty"`
 }
 
 // InvalidJobPayloadError wraps json or msgpack decoding error.
