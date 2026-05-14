@@ -23,12 +23,56 @@ func NewClient() redis.UniversalClient {
 	})
 }
 
-// Reset is used to clear redis for next test.
-func Reset(client redis.UniversalClient) error {
-	if cc, ok := client.(*redis.ClusterClient); ok {
-		return cc.ForEachMaster(context.Background(), func(ctx context.Context, c *redis.Client) error {
-			return c.FlushAll(ctx).Err()
-		})
+// Reset deletes keys belonging to the given namespaces so the caller starts
+// from a clean slate. Scoping cleanup to namespaces lets tests in different
+// packages run in parallel against the same Redis without one test's reset
+// wiping another test's in-progress data (which a FlushAll would do).
+//
+// Passing no namespaces falls back to FlushAll for legacy callers.
+func Reset(client redis.UniversalClient, namespaces ...string) error {
+	ctx := context.Background()
+	if len(namespaces) == 0 {
+		if cc, ok := client.(*redis.ClusterClient); ok {
+			return cc.ForEachMaster(ctx, func(ctx context.Context, c *redis.Client) error {
+				return c.FlushAll(ctx).Err()
+			})
+		}
+		return client.FlushAll(ctx).Err()
 	}
-	return client.FlushAll(context.Background()).Err()
+
+	deleteMatching := func(ctx context.Context, c redis.Cmdable, pattern string) error {
+		var cursor uint64
+		for {
+			keys, next, err := c.Scan(ctx, cursor, pattern, 1000).Result()
+			if err != nil {
+				return err
+			}
+			if len(keys) > 0 {
+				if err := c.Del(ctx, keys...).Err(); err != nil {
+					return err
+				}
+			}
+			if next == 0 {
+				return nil
+			}
+			cursor = next
+		}
+	}
+
+	for _, ns := range namespaces {
+		pattern := ns + ":*"
+		if cc, ok := client.(*redis.ClusterClient); ok {
+			err := cc.ForEachMaster(ctx, func(ctx context.Context, c *redis.Client) error {
+				return deleteMatching(ctx, c, pattern)
+			})
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		if err := deleteMatching(ctx, client, pattern); err != nil {
+			return err
+		}
+	}
+	return nil
 }

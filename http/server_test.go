@@ -16,7 +16,7 @@ import (
 func TestServer(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{ns-http}"))
 	q := work.NewRedisQueue(client)
 
 	srv := NewServer(&ServerOptions{
@@ -89,15 +89,15 @@ func TestServer(t *testing.T) {
 		},
 		{
 			reqMethod: "DELETE",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=xxx",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns-http%7D&job_id=xxx",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
+			respBody:  "{\"namespace\":\"{ns-http}\",\"queue_id\":\"\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=xxx",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns-http%7D&job_id=xxx",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"status\":\"completed\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
+			respBody:  "{\"namespace\":\"{ns-http}\",\"status\":\"completed\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
 		},
 		{
 			// bad duration
@@ -122,91 +122,91 @@ func TestServer(t *testing.T) {
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
 			reqBody: `{
-				"namespace": "{ns1}",
+				"namespace": "{ns-http}",
 				"queue_id": "q1",
 				"payload": "payload1",
 				"delay": "10s"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns-http%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":0,\"scheduled_total\":1,\"total\":1,\"latency\":0}\n",
+			respBody:  "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"ready_total\":0,\"scheduled_total\":1,\"total\":1,\"latency\":0}\n",
 		},
 		{
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
 			reqBody: `{
-				"namespace": "{ns1}",
+				"namespace": "{ns-http}",
 				"queue_id": "q1",
 				"payload": "payload1"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns-http%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2,\"latency\":[0-9]+}\n",
+			respBody:  "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2,\"latency\":[0-9]+}\n",
 		},
 		{
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
 			reqBody: `{
-				"namespace": "{ns1}",
+				"namespace": "{ns-http}",
 				"queue_id": "q1",
 				"id": "id1",
 				"payload": "payload1"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			// same job id
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
 			reqBody: `{
-				"namespace": "{ns1}",
+				"namespace": "{ns-http}",
 				"queue_id": "q1",
 				"id": "id1",
 				"payload": "payload2"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns-http%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":2,\"scheduled_total\":1,\"total\":3,\"latency\":[0-9]+}\n",
+			respBody:  "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"ready_total\":2,\"scheduled_total\":1,\"total\":3,\"latency\":[0-9]+}\n",
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns-http%7D&job_id=id1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"status\":\"ready\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody:  "{\"namespace\":\"{ns-http}\",\"status\":\"ready\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "DELETE",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns-http%7D&job_id=id1",
 			respCode:  500,
 			respBody:  "{\"error\":\"work: empty queue id\"}\n",
 		},
 		{
 			reqMethod: "DELETE",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=id1",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns-http%7D&queue_id=q1&job_id=id1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody:  "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
 		},
 		{
 			reqMethod: "GET",
-			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns-http%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2,\"latency\":[0-9]+}\n",
+			respBody:  "{\"namespace\":\"{ns-http}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2,\"latency\":[0-9]+}\n",
 		},
 	} {
 		var reqBody io.Reader

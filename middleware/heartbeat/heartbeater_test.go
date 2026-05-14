@@ -14,11 +14,11 @@ import (
 func TestHeartbeater(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{ns-heartbeat}"))
 
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
-		Namespace:    "{ns1}",
+		Namespace:    "{ns-heartbeat}",
 		QueueID:      "q1",
 		At:           time.Now(),
 		InvisibleSec: 60,
@@ -41,7 +41,7 @@ func TestHeartbeater(t *testing.T) {
 
 	z, err := client.ZRangeByScoreWithScores(
 		context.Background(),
-		"{ns1}:queue:q1",
+		"{ns-heartbeat}:queue:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",

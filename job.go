@@ -30,6 +30,31 @@ type Job struct {
 	Retries int64 `msgpack:"retries"`
 	// If the job previously fails, LastError will be populated with error string.
 	LastError string `msgpack:"last_error"`
+
+	// AllowPromotion controls whether Enqueue and PromoteJob may lower this
+	// job's score.
+	//
+	// When false (default), both operations use ZADD XX GT semantics: once a
+	// job is scheduled at time T, a subsequent Enqueue with score T' < T is
+	// a no-op, and PromoteJob cannot reduce the score. This preserves the
+	// "deferral" guarantee relied on by deterministic-ID jobs that may be
+	// enqueued multiple times concurrently (a dedup pattern) and prevents
+	// PromoteJob from demoting a job whose score has been bumped to
+	// now + InvisibleSec by Dequeue.
+	//
+	// When true, both operations use ZADD XX (no GT). This lets an
+	// explicit caller lower the score, for example in an opt-in retry flow
+	// where backoff should override Dequeue's InvisibleSec mark, and lets
+	// PromoteJob advance a scheduled-but-pending job to now. The caller is
+	// responsible for ensuring this is safe — typically that the job has a
+	// unique ID and is not relied on for dedup-deferral.
+	//
+	// This field is write-only at the Go API: it is persisted to Redis on
+	// Enqueue and consulted server-side by Enqueue and PromoteJob, but it
+	// is NOT rehydrated onto jobs returned by Dequeue or BulkFind — those
+	// always observe the zero value. PromoteJob reads the persisted value
+	// directly from Redis, so callers do not need to round-trip it.
+	AllowPromotion bool `msgpack:"-" json:",omitempty"`
 }
 
 // InvalidJobPayloadError wraps json or msgpack decoding error.

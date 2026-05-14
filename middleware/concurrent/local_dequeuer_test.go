@@ -30,7 +30,7 @@ func TestLocalDequeuer(t *testing.T) {
 	}
 
 	opt := &work.DequeueOptions{
-		Namespace:    "{ns1}",
+		Namespace:    "{ns-concurrent}",
 		QueueID:      "q1",
 		At:           time.Now(),
 		InvisibleSec: 60,
