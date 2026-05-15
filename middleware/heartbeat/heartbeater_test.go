@@ -2,6 +2,8 @@ package heartbeat
 
 import (
 	"context"
+	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,4 +51,51 @@ func TestHeartbeater(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, z, 1)
 	require.EqualValues(t, job.EnqueuedAt.Unix(), z[0].Score)
+}
+
+type countingQueue struct {
+	count atomic.Int64
+}
+
+func (q *countingQueue) Enqueue(*work.Job, *work.EnqueueOptions) error {
+	q.count.Add(1)
+	return nil
+}
+
+func (q *countingQueue) Dequeue(*work.DequeueOptions) (*work.Job, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (q *countingQueue) Ack(*work.Job, *work.AckOptions) error {
+	return errors.New("not implemented")
+}
+
+func TestHeartbeaterStopsAfterPanic(t *testing.T) {
+	queue := &countingQueue{}
+	job := work.NewJob()
+	opt := &work.DequeueOptions{
+		Namespace:    "{ns-heartbeat-panic}",
+		QueueID:      "q1",
+		At:           time.Now(),
+		InvisibleSec: 60,
+	}
+
+	hb := Heartbeater(&HeartbeaterOptions{
+		Queue:        queue,
+		InvisibleSec: 30,
+		IntervalSec:  1,
+	})
+
+	h := hb(func(*work.Job, *work.DequeueOptions) error {
+		panic("boom")
+	})
+
+	require.Panics(t, func() {
+		_ = h(job, opt)
+	})
+	require.Equal(t, job.EnqueuedAt.Unix(), job.UpdatedAt.Unix()+30)
+	require.NotEqual(t, job.CreatedAt, job.UpdatedAt)
+
+	time.Sleep(1100 * time.Millisecond)
+	require.EqualValues(t, 1, queue.count.Load())
 }
