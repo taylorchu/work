@@ -228,6 +228,20 @@ type Queue interface {
 	Dequeuer
 }
 
+// Requeuer is an optional interface a Queue may implement to express the
+// framework's retry move ("this job failed, put it back") distinctly from
+// Enqueue ("add a new job"). When a Queue implements Requeuer, the worker's
+// retry path calls Requeue with the computed backoff instead of Enqueue.
+//
+// RedisQueue does not implement Requeuer, so its retry behavior is unchanged
+// (Enqueue with a bumped score). A custom Queue whose Enqueue and "retry a
+// failed in-flight job" are different operations — for example one that keeps
+// waiting and in-flight jobs in separate structures — implements Requeuer so
+// the retry path is unambiguous.
+type Requeuer interface {
+	Requeue(job *Job, backoff time.Duration, opt *EnqueueOptions) error
+}
+
 // BulkEnqueuer enqueues jobs in a batch.
 type BulkEnqueuer interface {
 	BulkEnqueue([]*Job, *EnqueueOptions) error

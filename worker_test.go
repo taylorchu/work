@@ -498,3 +498,85 @@ func TestRetry(t *testing.T) {
 		require.True(t, delays[i] > 1)
 	}
 }
+
+// fakeRequeuerQueue is a Queue that also implements Requeuer; it records which
+// path the retry middleware takes.
+type fakeRequeuerQueue struct {
+	enqueued    int
+	requeued    int
+	lastBackoff time.Duration
+	requeueErr  error
+}
+
+func (q *fakeRequeuerQueue) Enqueue(*Job, *EnqueueOptions) error   { q.enqueued++; return nil }
+func (q *fakeRequeuerQueue) Dequeue(*DequeueOptions) (*Job, error) { return nil, ErrEmptyQueue }
+func (q *fakeRequeuerQueue) Ack(*Job, *AckOptions) error           { return nil }
+func (q *fakeRequeuerQueue) Requeue(job *Job, backoff time.Duration, opt *EnqueueOptions) error {
+	q.requeued++
+	q.lastBackoff = backoff
+	return q.requeueErr
+}
+
+// fakePlainQueue is a Queue that does NOT implement Requeuer.
+type fakePlainQueue struct{ enqueued int }
+
+func (q *fakePlainQueue) Enqueue(*Job, *EnqueueOptions) error   { q.enqueued++; return nil }
+func (q *fakePlainQueue) Dequeue(*DequeueOptions) (*Job, error) { return nil, ErrEmptyQueue }
+func (q *fakePlainQueue) Ack(*Job, *AckOptions) error           { return nil }
+
+func TestRetryPrefersRequeuer(t *testing.T) {
+	q := &fakeRequeuerQueue{}
+	retrier := retry(q, defaultBackoff())
+	job := NewJob()
+	opt := &DequeueOptions{Namespace: "{ns}", QueueID: "q1", InvisibleSec: 10}
+
+	h := retrier(func(*Job, *DequeueOptions) error { return fmt.Errorf("boom") })
+	err := h(job, opt)
+	require.Error(t, err)
+
+	// The retry move went through Requeue (with a backoff), not Enqueue.
+	require.Equal(t, 1, q.requeued)
+	require.Equal(t, 0, q.enqueued)
+	require.EqualValues(t, 1, job.Retries)
+	// EnqueuedAt is advanced to the next-execution time by the same backoff
+	// that was passed to Requeue, so job metadata and the scheduling
+	// instruction agree.
+	require.Positive(t, q.lastBackoff)
+	require.Equal(t, job.UpdatedAt.Add(q.lastBackoff), job.EnqueuedAt)
+}
+
+func TestRetryRequeueErrorSurfaced(t *testing.T) {
+	reqErr := errors.New("redis unavailable")
+	q := &fakeRequeuerQueue{requeueErr: reqErr}
+
+	// Build the chain the worker builds: wrapHandlerError sits inside retry, so
+	// a handler error becomes a *wrappedHandlerError that Worker.start
+	// suppresses. A Requeue failure must escape that suppression.
+	inner := wrapHandlerError(func(*Job, *DequeueOptions) error { return fmt.Errorf("boom") })
+	h := retry(q, defaultBackoff())(inner)
+	opt := &DequeueOptions{Namespace: "{ns}", QueueID: "q1", InvisibleSec: 10}
+
+	err := h(NewJob(), opt)
+	require.Error(t, err)
+	// The requeue failure is reported (errors.Is finds it)...
+	require.ErrorIs(t, err, reqErr)
+	// ...and it is NOT a wrappedHandlerError, so Worker.start's suppression
+	// branch does not swallow it.
+	var whe *wrappedHandlerError
+	require.False(t, errors.As(err, &whe), "requeue failure must not be suppressed as a handler error")
+}
+
+func TestRetryFallsBackToEnqueue(t *testing.T) {
+	q := &fakePlainQueue{}
+	retrier := retry(q, defaultBackoff())
+	job := NewJob()
+	opt := &DequeueOptions{Namespace: "{ns}", QueueID: "q1", InvisibleSec: 10}
+
+	h := retrier(func(*Job, *DequeueOptions) error { return fmt.Errorf("boom") })
+	err := h(job, opt)
+	require.Error(t, err)
+
+	// A queue without Requeuer keeps using Enqueue — byte-identical behavior.
+	require.Equal(t, 1, q.enqueued)
+	require.EqualValues(t, 1, job.Retries)
+}
