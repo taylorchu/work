@@ -15,7 +15,7 @@ import (
 func TestDequeuer(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{ns-concurrent}"))
 
 	var called int
 	h1 := func(*work.DequeueOptions) (*work.Job, error) {
@@ -38,7 +38,7 @@ func TestDequeuer(t *testing.T) {
 	}
 
 	opt := &work.DequeueOptions{
-		Namespace:    "{ns1}",
+		Namespace:    "{ns-concurrent}",
 		QueueID:      "q1",
 		At:           time.Now(),
 		InvisibleSec: 60,
@@ -75,7 +75,7 @@ func TestDequeuer(t *testing.T) {
 
 	z, err := client.ZRangeByScoreWithScores(
 		context.Background(),
-		"{ns1}:lock:q1",
+		"{ns-concurrent}:lock:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -87,7 +87,7 @@ func TestDequeuer(t *testing.T) {
 	require.EqualValues(t, opt.At.Unix()+60, z[0].Score)
 	require.EqualValues(t, opt.At.Unix()+60, z[1].Score)
 
-	require.NoError(t, client.ZRem(context.Background(), "{ns1}:lock:q1", "w1").Err())
+	require.NoError(t, client.ZRem(context.Background(), "{ns-concurrent}:lock:q1", "w1").Err())
 	optLater := *opt
 	optLater.At = opt.At.Add(10 * time.Second)
 	// worker 0 is locked already
@@ -105,7 +105,7 @@ func TestDequeuer(t *testing.T) {
 
 	z, err = client.ZRangeByScoreWithScores(
 		context.Background(),
-		"{ns1}:lock:q1",
+		"{ns-concurrent}:lock:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -137,7 +137,7 @@ func TestDequeuer(t *testing.T) {
 
 	z, err = client.ZRangeByScoreWithScores(
 		context.Background(),
-		"{ns1}:lock:q1",
+		"{ns-concurrent}:lock:q1",
 		&redis.ZRangeBy{
 			Min: "-inf",
 			Max: "+inf",
@@ -155,7 +155,7 @@ func BenchmarkConcurrency(b *testing.B) {
 
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(b, redistest.Reset(client))
+	require.NoError(b, redistest.Reset(client, "{ns-concurrent}"))
 
 	var called int
 	h1 := func(*work.DequeueOptions) (*work.Job, error) {
@@ -178,7 +178,7 @@ func BenchmarkConcurrency(b *testing.B) {
 	}
 
 	opt := &work.DequeueOptions{
-		Namespace:    "{ns1}",
+		Namespace:    "{ns-concurrent}",
 		QueueID:      "q1",
 		At:           time.Now(),
 		InvisibleSec: 60,

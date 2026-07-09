@@ -14,7 +14,7 @@ import (
 func TestSidekiqQueueExternalEnqueue(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{sidekiq}"))
 
 	q := NewQueue(client)
 	job := work.NewJob()
@@ -44,7 +44,7 @@ func TestSidekiqQueueExternalEnqueue(t *testing.T) {
 func TestSidekiqQueueExternalEnqueueScheduled(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{sidekiq}"))
 
 	q := NewQueue(client)
 	job := work.NewJob()
@@ -80,7 +80,7 @@ func TestSidekiqQueueExternalEnqueueScheduled(t *testing.T) {
 func TestSidekiqQueueExternalBulkEnqueue(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{sidekiq}"))
 	q := NewQueue(client)
 
 	const jobCount = 100000

@@ -34,10 +34,10 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 			b.StopTimer()
 
 			for n := 0; n < b.N; n++ {
-				require.NoError(b, redistest.Reset(client))
+				require.NoError(b, redistest.Reset(client, "{ns-bench}"))
 
 				wp := work.NewWorkerPoolWithOptions(
-					struct{}{}, 1, "{ns1}", pool,
+					struct{}{}, 1, "{ns-bench}", pool,
 					work.WorkerPoolOptions{
 						SleepBackoffs: []int64{1000},
 					},
@@ -49,7 +49,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 					return nil
 				})
 
-				enqueuer := work.NewEnqueuer("{ns1}", pool)
+				enqueuer := work.NewEnqueuer("{ns-bench}", pool)
 				for i := 0; i < k; i++ {
 					_, err := enqueuer.Enqueue("test", nil)
 					require.NoError(b, err)
@@ -68,11 +68,11 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 			b.StopTimer()
 
 			for n := 0; n < b.N; n++ {
-				require.NoError(b, redistest.Reset(client))
+				require.NoError(b, redistest.Reset(client, "{ns-bench}"))
 
 				queue := work2.NewRedisQueue(client)
 				w := work2.NewWorker(&work2.WorkerOptions{
-					Namespace: "{ns1}",
+					Namespace: "{ns-bench}",
 					Queue:     queue,
 				})
 				var wg sync.WaitGroup
@@ -93,7 +93,7 @@ func BenchmarkWorkerRunJob(b *testing.B) {
 					job := work2.NewJob()
 
 					err := queue.Enqueue(job, &work2.EnqueueOptions{
-						Namespace: "{ns1}",
+						Namespace: "{ns-bench}",
 						QueueID:   "test",
 					})
 					require.NoError(b, err)

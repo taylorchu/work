@@ -13,7 +13,7 @@ import (
 func TestEnqueuerBypass(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{ns-unique}"))
 
 	enq := Enqueuer(&EnqueuerOptions{
 		Client: client,
@@ -30,7 +30,7 @@ func TestEnqueuerBypass(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		job := work.NewJob()
 		err := h(job, &work.EnqueueOptions{
-			Namespace: "{ns1}",
+			Namespace: "{ns-unique}",
 			QueueID:   "q1",
 		})
 		require.NoError(t, err)
@@ -41,7 +41,7 @@ func TestEnqueuerBypass(t *testing.T) {
 func TestEnqueuer(t *testing.T) {
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{ns-unique}"))
 
 	enq := Enqueuer(&EnqueuerOptions{
 		Client: client,
@@ -58,7 +58,7 @@ func TestEnqueuer(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		job := work.NewJob()
 		err := h(job, &work.EnqueueOptions{
-			Namespace: "{ns1}",
+			Namespace: "{ns-unique}",
 			QueueID:   "q1",
 		})
 		require.NoError(t, err)
@@ -66,10 +66,10 @@ func TestEnqueuer(t *testing.T) {
 	require.Equal(t, 1, called)
 
 	for i := 0; i < 3; i++ {
-		require.NoError(t, client.Del(context.Background(), "{ns1}:unique:q1:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08").Err())
+		require.NoError(t, client.Del(context.Background(), "{ns-unique}:unique:q1:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08").Err())
 		job := work.NewJob()
 		err := h(job, &work.EnqueueOptions{
-			Namespace: "{ns1}",
+			Namespace: "{ns-unique}",
 			QueueID:   "q1",
 		})
 		require.NoError(t, err)
@@ -82,7 +82,7 @@ func BenchmarkEnqueuer(b *testing.B) {
 
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(b, redistest.Reset(client))
+	require.NoError(b, redistest.Reset(client, "{ns-unique}"))
 
 	enq := Enqueuer(&EnqueuerOptions{
 		Client: client,
@@ -101,7 +101,7 @@ func BenchmarkEnqueuer(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		job := work.NewJob()
 		h(job, &work.EnqueueOptions{
-			Namespace: "{ns1}",
+			Namespace: "{ns-unique}",
 			QueueID:   "q1",
 		})
 	}

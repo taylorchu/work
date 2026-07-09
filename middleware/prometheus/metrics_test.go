@@ -20,7 +20,7 @@ func TestHandleFuncMetrics(t *testing.T) {
 
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
-		Namespace: "{ns1}",
+		Namespace: "{ns-prometheus}",
 		QueueID:   "q1",
 	}
 	h := HandleFuncMetrics(func(*work.Job, *work.DequeueOptions) error {
@@ -58,7 +58,7 @@ func TestEnqueueFuncMetrics(t *testing.T) {
 
 	job := work.NewJob()
 	opt := &work.EnqueueOptions{
-		Namespace: "{ns1}",
+		Namespace: "{ns-prometheus}",
 		QueueID:   "q1",
 	}
 	h := EnqueueFuncMetrics(func(*work.Job, *work.EnqueueOptions) error {
@@ -93,10 +93,10 @@ func TestExportWorkerMetrics(t *testing.T) {
 
 	client := redistest.NewClient()
 	defer client.Close()
-	require.NoError(t, redistest.Reset(client))
+	require.NoError(t, redistest.Reset(client, "{ns-prometheus}"))
 
 	w := work.NewWorker(&work.WorkerOptions{
-		Namespace: "{ns1}",
+		Namespace: "{ns-prometheus}",
 		Queue:     work.NewRedisQueue(client),
 	})
 	err = w.Register("test",

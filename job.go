@@ -30,6 +30,31 @@ type Job struct {
 	Retries int64 `msgpack:"retries"`
 	// If the job previously fails, LastError will be populated with error string.
 	LastError string `msgpack:"last_error"`
+
+	// AllowPromotion controls whether Enqueue and PromoteJob may lower this
+	// job's score.
+	//
+	// When false (default), both operations use ZADD XX GT semantics: once a
+	// job is scheduled at time T, a subsequent Enqueue with score T' < T is
+	// a no-op, and PromoteJob cannot reduce the score. This preserves the
+	// "deferral" guarantee relied on by deterministic-ID jobs that may be
+	// enqueued multiple times concurrently (a dedup pattern) and prevents
+	// PromoteJob from demoting a job whose score has been bumped to
+	// now + InvisibleSec by Dequeue.
+	//
+	// When true, both operations use ZADD XX (no GT). This lets an
+	// explicit caller lower the score, for example in an opt-in retry flow
+	// where backoff should override Dequeue's InvisibleSec mark, and lets
+	// PromoteJob advance a scheduled-but-pending job to now. The caller is
+	// responsible for ensuring this is safe — typically that the job has a
+	// unique ID and is not relied on for dedup-deferral.
+	//
+	// This field is write-only at the Go API: it is persisted to Redis on
+	// Enqueue and consulted server-side by Enqueue and PromoteJob, but it
+	// is NOT rehydrated onto jobs returned by Dequeue or BulkFind — those
+	// always observe the zero value. PromoteJob reads the persisted value
+	// directly from Redis, so callers do not need to round-trip it.
+	AllowPromotion bool `msgpack:"-" json:",omitempty"`
 }
 
 // InvalidJobPayloadError wraps json or msgpack decoding error.
@@ -203,6 +228,20 @@ type Queue interface {
 	Dequeuer
 }
 
+// Requeuer is an optional interface a Queue may implement to express the
+// framework's retry move ("this job failed, put it back") distinctly from
+// Enqueue ("add a new job"). When a Queue implements Requeuer, the worker's
+// retry path calls Requeue with the computed backoff instead of Enqueue.
+//
+// RedisQueue does not implement Requeuer, so its retry behavior is unchanged
+// (Enqueue with a bumped score). A custom Queue whose Enqueue and "retry a
+// failed in-flight job" are different operations — for example one that keeps
+// waiting and in-flight jobs in separate structures — implements Requeuer so
+// the retry path is unambiguous.
+type Requeuer interface {
+	Requeue(job *Job, backoff time.Duration, opt *EnqueueOptions) error
+}
+
 // BulkEnqueuer enqueues jobs in a batch.
 type BulkEnqueuer interface {
 	BulkEnqueue([]*Job, *EnqueueOptions) error
@@ -239,4 +278,21 @@ func (opt *FindOptions) Validate() error {
 // The length of the returned job list will be equal to the length of jobIDs.
 type BulkJobFinder interface {
 	BulkFind(jobIDs []string, opts *FindOptions) ([]*Job, error)
+}
+
+// PromoteOptions specifies how a job is promoted in the queue.
+type PromoteOptions struct {
+	Namespace string
+	QueueID   string
+}
+
+// Validate validates PromoteOptions.
+func (opt *PromoteOptions) Validate() error {
+	if opt.Namespace == "" {
+		return ErrEmptyNamespace
+	}
+	if opt.QueueID == "" {
+		return ErrEmptyQueueID
+	}
+	return nil
 }

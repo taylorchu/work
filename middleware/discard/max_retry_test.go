@@ -11,7 +11,7 @@ import (
 func TestMaxRetry(t *testing.T) {
 	job := work.NewJob()
 	opt := &work.DequeueOptions{
-		Namespace: "{ns1}",
+		Namespace: "{ns-discard}",
 		QueueID:   "q1",
 	}
 	d := MaxRetry(1)

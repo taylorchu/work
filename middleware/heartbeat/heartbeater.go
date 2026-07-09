@@ -54,12 +54,13 @@ func Heartbeater(hopts *HeartbeaterOptions) work.HandleMiddleware {
 				}
 			}()
 
-			err := f(job, opt)
-			cancel()
-			<-done
-			job.UpdatedAt = copiedJob.UpdatedAt
-			job.EnqueuedAt = copiedJob.EnqueuedAt
-			return err
+			defer func() {
+				cancel()
+				<-done
+				job.UpdatedAt = copiedJob.UpdatedAt
+				job.EnqueuedAt = copiedJob.EnqueuedAt
+			}()
+			return f(job, opt)
 		}
 	}
 }
