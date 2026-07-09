@@ -67,7 +67,7 @@ type Job = work.Job
 
 // JobResponse defines model for JobResponse.
 type JobResponse struct {
-	Job       *Job   `json:"job,omitempty"`
+	Job       Job    `json:"job"`
 	Namespace string `json:"namespace"`
 	QueueID   string `json:"queue_id"`
 }
@@ -77,7 +77,7 @@ type JobStatus string
 
 // JobStatusResponse defines model for JobStatusResponse.
 type JobStatusResponse struct {
-	Job       *Job   `json:"job,omitempty"`
+	Job       Job    `json:"job"`
 	Namespace string `json:"namespace"`
 
 	// Status Derived from EnqueuedAt — `completed` when unset, `scheduled` when in the future, `ready` when due.
@@ -109,6 +109,9 @@ type Namespace = string
 
 // QueueID defines model for QueueID.
 type QueueID = string
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Error
 
 // DeleteJobParams defines parameters for DeleteJob.
 type DeleteJobParams struct {
@@ -461,6 +464,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
+type BadRequestJSONResponse Error
+
 type ErrorJSONResponse Error
 
 type NotSupportedResponse struct {
@@ -484,6 +489,20 @@ func (response DeleteJob200JSONResponse) VisitDeleteJobResponse(w http.ResponseW
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteJob400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteJob400JSONResponse) VisitDeleteJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -531,6 +550,20 @@ func (response GetJob200JSONResponse) VisitGetJobResponse(w http.ResponseWriter)
 	return err
 }
 
+type GetJob400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetJob400JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetJob404Response = NotSupportedResponse
 
 func (response GetJob404Response) VisitGetJobResponse(w http.ResponseWriter) error {
@@ -574,6 +607,20 @@ func (response CreateJob200JSONResponse) VisitCreateJobResponse(w http.ResponseW
 	return err
 }
 
+type CreateJob400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateJob400JSONResponse) VisitCreateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CreateJob500JSONResponse struct{ ErrorJSONResponse }
 
 func (response CreateJob500JSONResponse) VisitCreateJobResponse(w http.ResponseWriter) error {
@@ -606,6 +653,20 @@ func (response GetMetrics200JSONResponse) VisitGetMetricsResponse(w http.Respons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMetrics400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetMetrics400JSONResponse) VisitGetMetricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }

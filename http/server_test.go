@@ -73,12 +73,12 @@ func TestServer(t *testing.T) {
 			respBody:  "{\"error\":\"can't decode JSON body: EOF\"}\n",
 		},
 		{
-			// bad url query
+			// missing required body fields
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
 			reqBody:   "{}",
-			respCode:  500,
-			respBody:  "{\"error\":\"work: empty namespace\"}\n",
+			respCode:  400,
+			respBody:  "{\"error\":\"namespace and queue_id are required\"}\n",
 		},
 		{
 			// missing required query parameter
@@ -223,7 +223,7 @@ func TestServer(t *testing.T) {
 }
 
 func TestJobStatus(t *testing.T) {
-	require.Equal(t, "completed", jobStatus(&work.Job{}))
-	require.Equal(t, "ready", jobStatus(work.NewJob()))
-	require.Equal(t, "scheduled", jobStatus(work.NewJob().Delay(10*time.Second)))
+	require.Equal(t, Completed, jobStatus(&work.Job{}))
+	require.Equal(t, Ready, jobStatus(work.NewJob()))
+	require.Equal(t, Scheduled, jobStatus(work.NewJob().Delay(10*time.Second)))
 }

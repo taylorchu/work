@@ -39,6 +39,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JobStatusResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotSupported"
         "500":
@@ -63,6 +65,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JobResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "500":
           $ref: "#/components/responses/Error"
     delete:
@@ -83,6 +87,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JobResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotSupported"
         "500":
@@ -105,6 +111,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/QueueMetricsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotSupported"
         "500":
@@ -139,10 +147,20 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: >
+        The request was malformed — a required query parameter was missing or
+        invalid, the request body could not be decoded, or a required body
+        field (`namespace`, `queue_id`) was absent.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     NotSupported:
       description: >
-        The configured queue backend does not support this operation, or the
-        HTTP method is not allowed on this path.
+        The configured queue backend does not support this operation. Requesting
+        a valid path with an unsupported HTTP method instead yields
+        `405 Method Not Allowed` with a plain-text body.
   schemas:
     Job:
       # Mapped to the existing work.Job type; the properties below are
@@ -229,6 +247,7 @@ components:
       required:
         - namespace
         - status
+        - job
       properties:
         namespace:
           type: string
@@ -241,6 +260,7 @@ components:
       required:
         - namespace
         - queue_id
+        - job
       properties:
         namespace:
           type: string

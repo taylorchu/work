@@ -46,7 +46,7 @@ func (opts *ServerOptions) DeleteJob(ctx context.Context, request DeleteJobReque
 	return DeleteJob200JSONResponse{
 		Namespace: namespace,
 		QueueID:   queueID,
-		Job:       job,
+		Job:       *job,
 	}, nil
 }
 
@@ -73,13 +73,18 @@ func (opts *ServerOptions) GetJob(ctx context.Context, request GetJobRequestObje
 	}
 	return GetJob200JSONResponse{
 		Namespace: namespace,
-		Status:    JobStatus(jobStatus(job)),
-		Job:       job,
+		Status:    jobStatus(job),
+		Job:       *job,
 	}, nil
 }
 
 func (opts *ServerOptions) CreateJob(ctx context.Context, request CreateJobRequestObject) (CreateJobResponseObject, error) {
 	copt := request.Body
+	// namespace/queue_id are required by the spec; the generated wrapper only
+	// enforces required query params, not body fields, so check them here.
+	if copt.Namespace == "" || copt.QueueID == "" {
+		return CreateJob400JSONResponse{BadRequestJSONResponse{Error: "namespace and queue_id are required"}}, nil
+	}
 	if copt.ID != "" {
 		if finder, ok := opts.Queue.(work.BulkJobFinder); ok {
 			// best effort to check for duplicates
@@ -93,7 +98,7 @@ func (opts *ServerOptions) CreateJob(ctx context.Context, request CreateJobReque
 				return CreateJob200JSONResponse{
 					Namespace: copt.Namespace,
 					QueueID:   copt.QueueID,
-					Job:       jobs[0],
+					Job:       *jobs[0],
 				}, nil
 			}
 		}
@@ -112,7 +117,7 @@ func (opts *ServerOptions) CreateJob(ctx context.Context, request CreateJobReque
 	return CreateJob200JSONResponse{
 		Namespace: copt.Namespace,
 		QueueID:   copt.QueueID,
-		Job:       job,
+		Job:       *job,
 	}, nil
 }
 
@@ -168,12 +173,12 @@ func NewServer(opts *ServerOptions) http.Handler {
 	})
 }
 
-func jobStatus(job *work.Job) string {
+func jobStatus(job *work.Job) JobStatus {
 	if job.EnqueuedAt.IsZero() {
-		return "completed"
+		return Completed
 	}
 	if job.EnqueuedAt.After(time.Now()) {
-		return "scheduled"
+		return Scheduled
 	}
-	return "ready"
+	return Ready
 }
