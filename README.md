@@ -42,7 +42,8 @@ Please see `cmd/` for enqueuer and worker demo.
   - [x] create job
   - [x] get job status
   - [x] get queue metrics (kubernetes autoscaler integration with [keda metrics api scaler](https://keda.sh/docs/2.5/scalers/metrics-api/))
-  - [ ] OpenAPI spec
+  - [x] OpenAPI spec
+    - see [`http/openapi.yaml`](http/openapi.yaml).
 
 ## License
 
