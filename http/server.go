@@ -46,7 +46,7 @@ func (opts *ServerOptions) DeleteJob(ctx context.Context, request DeleteJobReque
 	return DeleteJob200JSONResponse{
 		Namespace: namespace,
 		QueueID:   queueID,
-		Job:       *job,
+		Job:       toJob(job),
 	}, nil
 }
 
@@ -74,7 +74,7 @@ func (opts *ServerOptions) GetJob(ctx context.Context, request GetJobRequestObje
 	return GetJob200JSONResponse{
 		Namespace: namespace,
 		Status:    jobStatus(job),
-		Job:       *job,
+		Job:       toJob(job),
 	}, nil
 }
 
@@ -98,7 +98,7 @@ func (opts *ServerOptions) CreateJob(ctx context.Context, request CreateJobReque
 				return CreateJob200JSONResponse{
 					Namespace: copt.Namespace,
 					QueueID:   copt.QueueID,
-					Job:       *jobs[0],
+					Job:       toJob(jobs[0]),
 				}, nil
 			}
 		}
@@ -117,7 +117,7 @@ func (opts *ServerOptions) CreateJob(ctx context.Context, request CreateJobReque
 	return CreateJob200JSONResponse{
 		Namespace: copt.Namespace,
 		QueueID:   copt.QueueID,
-		Job:       *job,
+		Job:       toJob(job),
 	}, nil
 }
 
@@ -171,6 +171,21 @@ func NewServer(opts *ServerOptions) http.Handler {
 	return HandlerWithOptions(strict, StdHTTPServerOptions{
 		ErrorHandlerFunc: jsonError(http.StatusBadRequest),
 	})
+}
+
+// toJob maps the internal work.Job onto the API's own wire representation, so
+// work.Job's Go field names never leak onto the wire.
+func toJob(j *work.Job) Job {
+	payload := j.Payload
+	return Job{
+		ID:         j.ID,
+		CreatedAt:  j.CreatedAt,
+		UpdatedAt:  j.UpdatedAt,
+		EnqueuedAt: j.EnqueuedAt,
+		Payload:    &payload,
+		Retries:    j.Retries,
+		LastError:  j.LastError,
+	}
 }
 
 func jobStatus(job *work.Job) JobStatus {

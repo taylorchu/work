@@ -163,38 +163,44 @@ components:
         `405 Method Not Allowed` with a plain-text body.
   schemas:
     Job:
-      # Mapped to the existing work.Job type; the properties below are
-      # documentation only. Field names use Go's default JSON encoding
-      # (work.Job carries no json tags).
-      x-go-type: work.Job
-      x-go-type-import:
-        path: github.com/taylorchu/work
+      # The API's own job representation, mapped from work.Job in the handlers.
+      # Field names are snake_case for consistency with the rest of the API;
+      # work.Job's Go field names are deliberately not exposed on the wire.
       type: object
+      required:
+        - id
+        - created_at
+        - updated_at
+        - enqueued_at
+        - payload
+        - retries
+        - last_error
       properties:
-        ID:
+        id:
           type: string
           description: Unique id of the job.
-        CreatedAt:
+        created_at:
           type: string
           format: date-time
-          description: When NewJob() was first called.
-        UpdatedAt:
+          description: When the job was first created.
+        updated_at:
           type: string
           format: date-time
           description: When the job was last executed.
-        EnqueuedAt:
+        enqueued_at:
           type: string
           format: date-time
           description: When the job will be executed next.
-        Payload:
+        payload:
           type: string
           format: byte
-          description: Raw job payload, base64-encoded on output.
-        Retries:
+          nullable: true
+          description: Raw job payload, base64-encoded on output; null when empty.
+        retries:
           type: integer
           format: int64
           description: Number of times the job has failed and been retried.
-        LastError:
+        last_error:
           type: string
           description: Error string from the most recent failure, if any.
     JobStatus:

@@ -91,13 +91,13 @@ func TestServer(t *testing.T) {
 			reqMethod: "DELETE",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=xxx",
 			respCode:  200,
-			respBody:  "{\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}\n",
+			respBody:  "{\"job\":{\"created_at\":\"0001-01-01T00:00:00Z\",\"enqueued_at\":\"0001-01-01T00:00:00Z\",\"id\":\"xxx\",\"last_error\":\"\",\"payload\":null,\"retries\":0,\"updated_at\":\"0001-01-01T00:00:00Z\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}\n",
 		},
 		{
 			reqMethod: "GET",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=xxx",
 			respCode:  200,
-			respBody:  "{\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"},\"namespace\":\"{ns1}\",\"status\":\"completed\"}\n",
+			respBody:  "{\"job\":{\"created_at\":\"0001-01-01T00:00:00Z\",\"enqueued_at\":\"0001-01-01T00:00:00Z\",\"id\":\"xxx\",\"last_error\":\"\",\"payload\":null,\"retries\":0,\"updated_at\":\"0001-01-01T00:00:00Z\"},\"namespace\":\"{ns1}\",\"status\":\"completed\"}\n",
 		},
 		{
 			// bad duration
@@ -128,7 +128,7 @@ func TestServer(t *testing.T) {
 				"delay": "10s"
 			}`,
 			respCode: 200,
-			respBody: "{\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:-]+\",\"enqueued_at\":\"[TZ0-9:-]+\",\"id\":\"[a-z0-9-]{36}\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			reqMethod: "GET",
@@ -145,7 +145,7 @@ func TestServer(t *testing.T) {
 				"payload": "payload1"
 			}`,
 			respCode: 200,
-			respBody: "{\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:-]+\",\"enqueued_at\":\"[TZ0-9:-]+\",\"id\":\"[a-z0-9-]{36}\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			reqMethod: "GET",
@@ -163,7 +163,7 @@ func TestServer(t *testing.T) {
 				"payload": "payload1"
 			}`,
 			respCode: 200,
-			respBody: "{\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:-]+\",\"enqueued_at\":\"[TZ0-9:-]+\",\"id\":\"id1\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			// same job id
@@ -176,7 +176,7 @@ func TestServer(t *testing.T) {
 				"payload": "payload2"
 			}`,
 			respCode: 200,
-			respBody: "{\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:-]+\",\"enqueued_at\":\"[TZ0-9:-]+\",\"id\":\"id1\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			reqMethod: "GET",
@@ -188,7 +188,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "GET",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
 			respCode:  200,
-			respBody:  "{\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"},\"namespace\":\"{ns1}\",\"status\":\"ready\"}",
+			respBody:  "{\"job\":{\"created_at\":\"[TZ0-9:-]+\",\"enqueued_at\":\"[TZ0-9:-]+\",\"id\":\"id1\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:-]+\"},\"namespace\":\"{ns1}\",\"status\":\"ready\"}",
 		},
 		{
 			// missing required query parameter
@@ -201,7 +201,7 @@ func TestServer(t *testing.T) {
 			reqMethod: "DELETE",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=id1",
 			respCode:  200,
-			respBody:  "{\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
+			respBody:  "{\"job\":{\"created_at\":\"[TZ0-9:-]+\",\"enqueued_at\":\"[TZ0-9:-]+\",\"id\":\"id1\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			reqMethod: "GET",

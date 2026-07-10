@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/oapi-codegen/runtime"
-	"github.com/taylorchu/work"
 )
 
 // Defines values for JobStatus.
@@ -63,7 +62,28 @@ type Error struct {
 }
 
 // Job defines model for Job.
-type Job = work.Job
+type Job struct {
+	// CreatedAt When the job was first created.
+	CreatedAt time.Time `json:"created_at"`
+
+	// EnqueuedAt When the job will be executed next.
+	EnqueuedAt time.Time `json:"enqueued_at"`
+
+	// ID Unique id of the job.
+	ID string `json:"id"`
+
+	// LastError Error string from the most recent failure, if any.
+	LastError string `json:"last_error"`
+
+	// Payload Raw job payload, base64-encoded on output; null when empty.
+	Payload *[]byte `json:"payload"`
+
+	// Retries Number of times the job has failed and been retried.
+	Retries int64 `json:"retries"`
+
+	// UpdatedAt When the job was last executed.
+	UpdatedAt time.Time `json:"updated_at"`
+}
 
 // JobResponse defines model for JobResponse.
 type JobResponse struct {
