@@ -1,0 +1,11 @@
+# oapi-codegen config. Generates the request/response types and a std net/http
+# server interface in types.gen.go from openapi.yaml. Run via
+# `go generate ./http/...`.
+package: http
+output: types.gen.go
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
+output-options:
+  name-normalizer: ToCamelCaseWithInitialisms

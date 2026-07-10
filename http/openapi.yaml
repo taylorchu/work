@@ -1,0 +1,318 @@
+openapi: 3.0.3
+info:
+  title: work HTTP API
+  description: >
+    HTTP API for managing work queues, served by
+    `github.com/taylorchu/work/http`.NewServer.
+
+
+    The handler is mounted at the root, exposing `/jobs` and `/metrics`.
+    Availability of some operations depends on the underlying queue backend:
+    operations return `404 Not Found` when the configured queue does not
+    implement the required capability (`BulkJobFinder` for job lookup/delete,
+    `MetricsExporter` for metrics).
+
+
+    This spec is the source of truth for the Go request/response types in this
+    package: `types.gen.go` is generated from it via `go generate`. Changing
+    the wire contract means changing this file and regenerating.
+  version: "1.0.0"
+servers:
+  - url: /
+    description: Wherever NewServer's handler is mounted.
+paths:
+  /jobs:
+    get:
+      summary: Get job status
+      description: >
+        Look up a job by id and report its status. Requires a queue that
+        implements `BulkJobFinder`. If the job is not found, a job with only
+        `ID` populated is returned with status `completed`.
+      operationId: getJob
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/JobID"
+      responses:
+        "200":
+          description: Job status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatusResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotSupported"
+        "500":
+          $ref: "#/components/responses/Error"
+    post:
+      summary: Create (enqueue) a job
+      description: >
+        Enqueue a new job. If `id` is set and a job with that id already exists
+        in the namespace, the existing job is returned unchanged (best-effort
+        de-duplication).
+      operationId: createJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJobRequest"
+      responses:
+        "200":
+          description: The created (or pre-existing) job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/Error"
+    delete:
+      summary: Delete a job
+      description: >
+        Acknowledge (remove) a job from the queue. Requires a queue that
+        implements `BulkJobFinder`. Deleting a job that does not exist is a
+        no-op and still returns 200.
+      operationId: deleteJob
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/QueueID"
+        - $ref: "#/components/parameters/JobID"
+      responses:
+        "200":
+          description: The deleted job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotSupported"
+        "500":
+          $ref: "#/components/responses/Error"
+  /metrics:
+    get:
+      summary: Get queue metrics
+      description: >
+        Report queue depth and latency for a namespace/queue. Requires a queue
+        that implements `MetricsExporter`. Suitable for the KEDA metrics-api
+        scaler.
+      operationId: getMetrics
+      parameters:
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/QueueID"
+      responses:
+        "200":
+          description: Queue metrics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueMetricsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotSupported"
+        "500":
+          $ref: "#/components/responses/Error"
+components:
+  parameters:
+    Namespace:
+      name: namespace
+      in: query
+      required: true
+      description: Queue namespace.
+      schema:
+        type: string
+    QueueID:
+      name: queue_id
+      in: query
+      required: true
+      description: Queue id within the namespace.
+      schema:
+        type: string
+    JobID:
+      name: job_id
+      in: query
+      required: true
+      description: Job id.
+      schema:
+        type: string
+  responses:
+    Error:
+      description: The queue backend returned an error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: >
+        The request was malformed — a required query parameter was missing or
+        invalid, the request body could not be decoded, or a required body
+        field (`namespace`, `queue_id`) was absent.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotSupported:
+      description: >
+        The configured queue backend does not support this operation. Requesting
+        a valid path with an unsupported HTTP method instead yields
+        `405 Method Not Allowed` with a plain-text body.
+  schemas:
+    Job:
+      # The API's own job representation, mapped from work.Job in the handlers.
+      # Field names are snake_case for consistency with the rest of the API;
+      # work.Job's Go field names are deliberately not exposed on the wire.
+      type: object
+      required:
+        - id
+        - created_at
+        - updated_at
+        - enqueued_at
+        - payload
+        - retries
+        - last_error
+      properties:
+        id:
+          type: string
+          description: Unique id of the job.
+        created_at:
+          type: string
+          format: date-time
+          description: When the job was first created.
+        updated_at:
+          type: string
+          format: date-time
+          description: When the job was last executed.
+        enqueued_at:
+          type: string
+          format: date-time
+          description: When the job will be executed next.
+        payload:
+          type: string
+          format: byte
+          nullable: true
+          description: Opaque job payload as base64-encoded bytes; null when empty.
+        retries:
+          type: integer
+          format: int64
+          description: Number of times the job has failed and been retried.
+        last_error:
+          type: string
+          description: Error string from the most recent failure, if any.
+    JobStatus:
+      type: string
+      description: >
+        Derived from EnqueuedAt — `completed` when unset, `scheduled` when in
+        the future, `ready` when due.
+      enum:
+        - completed
+        - scheduled
+        - ready
+    CreateJobRequest:
+      type: object
+      required:
+        - namespace
+        - queue_id
+      properties:
+        namespace:
+          type: string
+          description: Queue namespace.
+        queue_id:
+          type: string
+          description: Queue id within the namespace.
+        # id/payload/delay are optional; x-go-type-skip-optional-pointer keeps
+        # them as plain value fields (not *T) so a zero value means "unset".
+        id:
+          type: string
+          x-go-type-skip-optional-pointer: true
+          description: >
+            Optional job id. If set and already present, the existing job is
+            returned instead of enqueuing a duplicate.
+        payload:
+          # Opaque bytes, base64-encoded on the wire in both directions so a
+          # payload round-trips exactly regardless of content (it need not be
+          # JSON). Mirrors Job.payload.
+          type: string
+          format: byte
+          x-go-type-skip-optional-pointer: true
+          description: Opaque job payload as base64-encoded bytes.
+        delay:
+          # Mapped to the package-local duration type, which (un)marshals a Go
+          # duration string such as "10s".
+          x-go-type: duration
+          x-go-type-skip-optional-pointer: true
+          type: string
+          description: >
+            Optional delay before the job becomes ready, as a Go duration
+            string (e.g. "10s", "1m30s").
+          example: "10s"
+    JobStatusResponse:
+      type: object
+      required:
+        - namespace
+        - status
+        - job
+      properties:
+        namespace:
+          type: string
+        status:
+          $ref: "#/components/schemas/JobStatus"
+        job:
+          $ref: "#/components/schemas/Job"
+    JobResponse:
+      type: object
+      required:
+        - namespace
+        - queue_id
+        - job
+      properties:
+        namespace:
+          type: string
+        queue_id:
+          type: string
+        job:
+          $ref: "#/components/schemas/Job"
+    QueueMetricsResponse:
+      type: object
+      required:
+        - namespace
+        - queue_id
+        - ready_total
+        - scheduled_total
+        - total
+        - latency
+      properties:
+        namespace:
+          type: string
+        queue_id:
+          type: string
+        ready_total:
+          type: integer
+          format: int64
+          description: Jobs that can be executed right now.
+        scheduled_total:
+          type: integer
+          format: int64
+          description: Jobs scheduled to run in the future.
+        total:
+          type: integer
+          format: int64
+          description: ready_total + scheduled_total.
+        latency:
+          # Go time.Duration, serialized as int64 nanoseconds. oapi-codegen
+          # auto-imports time for this well-known type.
+          x-go-type: time.Duration
+          type: integer
+          format: int64
+          description: Processing delay from the oldest ready job, in nanoseconds.
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

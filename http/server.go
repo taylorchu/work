@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -9,187 +10,127 @@ import (
 )
 
 // ServerOptions specifies how http server can manage work queues.
+// It implements the generated StrictServerInterface.
 type ServerOptions struct {
 	Queue work.Queue
 }
 
-func (opts *ServerOptions) deleteJob(rw http.ResponseWriter, r *http.Request) {
+func (opts *ServerOptions) DeleteJob(ctx context.Context, request DeleteJobRequestObject) (DeleteJobResponseObject, error) {
 	queue, ok := opts.Queue.(interface {
 		work.Queue
 		work.BulkJobFinder
 	})
 	if !ok {
-		rw.WriteHeader(http.StatusNotFound)
-		return
+		return DeleteJob404Response{}, nil
 	}
-	query := r.URL.Query()
-	namespace := query.Get("namespace")
-	queueID := query.Get("queue_id")
-	jobID := query.Get("job_id")
+	namespace := request.Params.Namespace
+	queueID := request.Params.QueueID
+	jobID := request.Params.JobID
 
-	job, err := func() (*work.Job, error) {
-		jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
-			Namespace: namespace,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(jobs) == 1 && jobs[0] != nil {
-			err := queue.Ack(jobs[0], &work.AckOptions{
-				Namespace: namespace,
-				QueueID:   queueID,
-			})
-			if err != nil {
-				return nil, err
-			}
-			return jobs[0], nil
-		}
-		return &work.Job{
-			ID: jobID,
-		}, nil
-	}()
+	jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
+		Namespace: namespace,
+	})
 	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(rw).Encode(struct {
-			Error string `json:"error"`
-		}{
-			Error: err.Error(),
-		})
-		return
+		return DeleteJob500JSONResponse{ErrorJSONResponse{Error: err.Error()}}, nil
 	}
-	json.NewEncoder(rw).Encode(struct {
-		Namespace string    `json:"namespace"`
-		QueueID   string    `json:"queue_id"`
-		Job       *work.Job `json:"job"`
-	}{
+	job := &work.Job{ID: jobID}
+	if len(jobs) == 1 && jobs[0] != nil {
+		if err := queue.Ack(jobs[0], &work.AckOptions{
+			Namespace: namespace,
+			QueueID:   queueID,
+		}); err != nil {
+			return DeleteJob500JSONResponse{ErrorJSONResponse{Error: err.Error()}}, nil
+		}
+		job = jobs[0]
+	}
+	return DeleteJob200JSONResponse{
 		Namespace: namespace,
 		QueueID:   queueID,
-		Job:       job,
-	})
+		Job:       toJob(job),
+	}, nil
 }
 
-func (opts *ServerOptions) getJob(rw http.ResponseWriter, r *http.Request) {
+func (opts *ServerOptions) GetJob(ctx context.Context, request GetJobRequestObject) (GetJobResponseObject, error) {
 	queue, ok := opts.Queue.(interface {
 		work.Queue
 		work.BulkJobFinder
 	})
 	if !ok {
-		rw.WriteHeader(http.StatusNotFound)
-		return
+		return GetJob404Response{}, nil
 	}
-	query := r.URL.Query()
-	namespace := query.Get("namespace")
-	jobID := query.Get("job_id")
+	namespace := request.Params.Namespace
+	jobID := request.Params.JobID
 
-	job, err := func() (*work.Job, error) {
-		jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
-			Namespace: namespace,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(jobs) == 1 && jobs[0] != nil {
-			return jobs[0], nil
-		}
-		return &work.Job{
-			ID: jobID,
-		}, nil
-	}()
+	jobs, err := queue.BulkFind([]string{jobID}, &work.FindOptions{
+		Namespace: namespace,
+	})
 	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(rw).Encode(struct {
-			Error string `json:"error"`
-		}{
-			Error: err.Error(),
-		})
-		return
+		return GetJob500JSONResponse{ErrorJSONResponse{Error: err.Error()}}, nil
 	}
-	json.NewEncoder(rw).Encode(struct {
-		Namespace string    `json:"namespace"`
-		Status    string    `json:"status"`
-		Job       *work.Job `json:"job"`
-	}{
+	job := &work.Job{ID: jobID}
+	if len(jobs) == 1 && jobs[0] != nil {
+		job = jobs[0]
+	}
+	return GetJob200JSONResponse{
 		Namespace: namespace,
 		Status:    jobStatus(job),
-		Job:       job,
-	})
+		Job:       toJob(job),
+	}, nil
 }
 
-type createJobOptions struct {
-	Namespace string          `json:"namespace"`
-	QueueID   string          `json:"queue_id"`
-	ID        string          `json:"id"`
-	Payload   json.RawMessage `json:"payload"`
-	Delay     duration        `json:"delay"`
-}
-
-func (opts *ServerOptions) createJob(rw http.ResponseWriter, r *http.Request) {
-	job, copt, err := func() (*work.Job, *createJobOptions, error) {
-		var copt createJobOptions
-		err := json.NewDecoder(r.Body).Decode(&copt)
-		if err != nil {
-			return nil, nil, err
-		}
-		if copt.ID != "" {
-			if finder, ok := opts.Queue.(work.BulkJobFinder); ok {
-				// best effort to check for duplicates
-				jobs, err := finder.BulkFind([]string{copt.ID}, &work.FindOptions{
+func (opts *ServerOptions) CreateJob(ctx context.Context, request CreateJobRequestObject) (CreateJobResponseObject, error) {
+	copt := request.Body
+	// namespace/queue_id are required by the spec; the generated wrapper only
+	// enforces required query params, not body fields, so check them here.
+	if copt.Namespace == "" || copt.QueueID == "" {
+		return CreateJob400JSONResponse{BadRequestJSONResponse{Error: "namespace and queue_id are required"}}, nil
+	}
+	if copt.ID != "" {
+		if finder, ok := opts.Queue.(work.BulkJobFinder); ok {
+			// best effort to check for duplicates
+			jobs, err := finder.BulkFind([]string{copt.ID}, &work.FindOptions{
+				Namespace: copt.Namespace,
+			})
+			if err != nil {
+				return CreateJob500JSONResponse{ErrorJSONResponse{Error: err.Error()}}, nil
+			}
+			if len(jobs) == 1 && jobs[0] != nil {
+				return CreateJob200JSONResponse{
 					Namespace: copt.Namespace,
-				})
-				if err != nil {
-					return nil, nil, err
-				}
-				if len(jobs) == 1 && jobs[0] != nil {
-					return jobs[0], &copt, nil
-				}
+					QueueID:   copt.QueueID,
+					Job:       toJob(jobs[0]),
+				}, nil
 			}
 		}
-		job := work.NewJob().Delay(time.Duration(copt.Delay))
-		if copt.ID != "" {
-			job.ID = copt.ID
-		}
-		job.Payload = copt.Payload
-		err = opts.Queue.Enqueue(job, &work.EnqueueOptions{
-			Namespace: copt.Namespace,
-			QueueID:   copt.QueueID,
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		return job, &copt, nil
-	}()
-	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(rw).Encode(struct {
-			Error string `json:"error"`
-		}{
-			Error: err.Error(),
-		})
-		return
 	}
-	json.NewEncoder(rw).Encode(struct {
-		Namespace string    `json:"namespace"`
-		QueueID   string    `json:"queue_id"`
-		Job       *work.Job `json:"job"`
-	}{
+	job := work.NewJob().Delay(time.Duration(copt.Delay))
+	if copt.ID != "" {
+		job.ID = copt.ID
+	}
+	job.Payload = copt.Payload
+	if err := opts.Queue.Enqueue(job, &work.EnqueueOptions{
 		Namespace: copt.Namespace,
 		QueueID:   copt.QueueID,
-		Job:       job,
-	})
+	}); err != nil {
+		return CreateJob500JSONResponse{ErrorJSONResponse{Error: err.Error()}}, nil
+	}
+	return CreateJob200JSONResponse{
+		Namespace: copt.Namespace,
+		QueueID:   copt.QueueID,
+		Job:       toJob(job),
+	}, nil
 }
 
-func (opts *ServerOptions) getMetrics(rw http.ResponseWriter, r *http.Request) {
+func (opts *ServerOptions) GetMetrics(ctx context.Context, request GetMetricsRequestObject) (GetMetricsResponseObject, error) {
 	queue, ok := opts.Queue.(interface {
 		work.Queue
 		work.MetricsExporter
 	})
 	if !ok {
-		rw.WriteHeader(http.StatusNotFound)
-		return
+		return GetMetrics404Response{}, nil
 	}
-	query := r.URL.Query()
-	namespace := query.Get("namespace")
-	queueID := query.Get("queue_id")
+	namespace := request.Params.Namespace
+	queueID := request.Params.QueueID
 
 	metrics, err := queue.GetQueueMetrics(&work.QueueMetricsOptions{
 		Namespace: namespace,
@@ -197,63 +138,62 @@ func (opts *ServerOptions) getMetrics(rw http.ResponseWriter, r *http.Request) {
 		At:        time.Now(),
 	})
 	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(rw).Encode(struct {
-			Error string `json:"error"`
-		}{
-			Error: err.Error(),
-		})
-		return
+		return GetMetrics500JSONResponse{ErrorJSONResponse{Error: err.Error()}}, nil
 	}
-	json.NewEncoder(rw).Encode(struct {
-		Namespace      string        `json:"namespace"`
-		QueueID        string        `json:"queue_id"`
-		ReadyTotal     int64         `json:"ready_total"`
-		ScheduledTotal int64         `json:"scheduled_total"`
-		Total          int64         `json:"total"`
-		Latency        time.Duration `json:"latency"`
-	}{
+	return GetMetrics200JSONResponse{
 		Namespace:      metrics.Namespace,
 		QueueID:        metrics.QueueID,
 		ReadyTotal:     metrics.ReadyTotal,
 		ScheduledTotal: metrics.ScheduledTotal,
 		Total:          metrics.ReadyTotal + metrics.ScheduledTotal,
 		Latency:        metrics.Latency,
-	})
+	}, nil
+}
+
+// jsonError returns an error handler that writes err as a JSON Error body with
+// the given status, so every error path shares the {"error": ...} shape.
+func jsonError(status int) func(http.ResponseWriter, *http.Request, error) {
+	return func(rw http.ResponseWriter, r *http.Request, err error) {
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(status)
+		json.NewEncoder(rw).Encode(Error{Error: err.Error()})
+	}
 }
 
 // NewServer creates new http server that manages work queues.
 func NewServer(opts *ServerOptions) http.Handler {
-	m := http.NewServeMux()
-	m.HandleFunc("/jobs", func(rw http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "DELETE":
-			opts.deleteJob(rw, r)
-		case "GET":
-			opts.getJob(rw, r)
-		case "POST":
-			opts.createJob(rw, r)
-		default:
-			rw.WriteHeader(http.StatusNotFound)
-		}
+	strict := NewStrictHandlerWithOptions(opts, nil, StrictHTTPServerOptions{
+		// Malformed request body -> 400; response encoding failure -> 500.
+		RequestErrorHandlerFunc:  jsonError(http.StatusBadRequest),
+		ResponseErrorHandlerFunc: jsonError(http.StatusInternalServerError),
 	})
-	m.HandleFunc("/metrics", func(rw http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			opts.getMetrics(rw, r)
-		default:
-			rw.WriteHeader(http.StatusNotFound)
-		}
+	// Missing/invalid required query parameter -> 400.
+	return HandlerWithOptions(strict, StdHTTPServerOptions{
+		ErrorHandlerFunc: jsonError(http.StatusBadRequest),
 	})
-	return m
 }
 
-func jobStatus(job *work.Job) string {
+// toJob maps the internal work.Job onto the API's own wire representation, so
+// work.Job's Go field names never leak onto the wire.
+func toJob(j *work.Job) Job {
+	payload := j.Payload
+	return Job{
+		ID:         j.ID,
+		CreatedAt:  j.CreatedAt,
+		UpdatedAt:  j.UpdatedAt,
+		EnqueuedAt: j.EnqueuedAt,
+		Payload:    &payload,
+		Retries:    j.Retries,
+		LastError:  j.LastError,
+	}
+}
+
+func jobStatus(job *work.Job) JobStatus {
 	if job.EnqueuedAt.IsZero() {
-		return "completed"
+		return Completed
 	}
 	if job.EnqueuedAt.After(time.Now()) {
-		return "scheduled"
+		return Scheduled
 	}
-	return "ready"
+	return Ready
 }

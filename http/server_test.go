@@ -41,82 +41,81 @@ func TestServer(t *testing.T) {
 			// bad method
 			reqMethod: "PUT",
 			reqURL:    "http://example.com/jobs",
-			respCode:  404,
-			respBody:  "",
+			respCode:  405,
+			respBody:  "Method Not Allowed\n",
 		},
 		{
 			// bad method
 			reqMethod: "PUT",
 			reqURL:    "http://example.com/metrics",
-			respCode:  404,
-			respBody:  "",
+			respCode:  405,
+			respBody:  "Method Not Allowed\n",
 		},
 		{
-			// bad url query
+			// missing required query parameter
 			reqMethod: "GET",
 			reqURL:    "http://example.com/jobs",
-			respCode:  500,
-			respBody:  "{\"error\":\"work: empty namespace\"}\n",
+			respCode:  400,
+			respBody:  "{\"error\":\"Query argument namespace is required, but not found\"}\n",
 		},
 		{
-			// bad url query
+			// missing required query parameter
 			reqMethod: "DELETE",
 			reqURL:    "http://example.com/jobs",
-			respCode:  500,
-			respBody:  "{\"error\":\"work: empty namespace\"}\n",
+			respCode:  400,
+			respBody:  "{\"error\":\"Query argument namespace is required, but not found\"}\n",
 		},
 		{
 			// bad body
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
-			respCode:  500,
-			respBody:  "{\"error\":\"EOF\"}\n",
+			respCode:  400,
+			respBody:  "{\"error\":\"can't decode JSON body: EOF\"}\n",
 		},
 		{
-			// bad url query
+			// missing required body fields
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
 			reqBody:   "{}",
-			respCode:  500,
-			respBody:  "{\"error\":\"work: empty namespace\"}\n",
+			respCode:  400,
+			respBody:  "{\"error\":\"namespace and queue_id are required\"}\n",
 		},
 		{
-			// bad url query
+			// missing required query parameter
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics",
-			respCode:  500,
-			respBody:  "{\"error\":\"work: empty namespace\"}\n",
+			respCode:  400,
+			respBody:  "{\"error\":\"Query argument namespace is required, but not found\"}\n",
 		},
 		{
 			reqMethod: "DELETE",
-			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=xxx",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=xxx",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
+			respBody:  "{\"job\":{\"created_at\":\"0001-01-01T00:00:00Z\",\"enqueued_at\":\"0001-01-01T00:00:00Z\",\"id\":\"xxx\",\"last_error\":\"\",\"payload\":null,\"retries\":0,\"updated_at\":\"0001-01-01T00:00:00Z\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}\n",
 		},
 		{
 			reqMethod: "GET",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=xxx",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"status\":\"completed\",\"job\":{\"ID\":\"xxx\",\"CreatedAt\":\"0001-01-01T00:00:00Z\",\"UpdatedAt\":\"0001-01-01T00:00:00Z\",\"EnqueuedAt\":\"0001-01-01T00:00:00Z\",\"Payload\":null,\"Retries\":0,\"LastError\":\"\"}}\n",
+			respBody:  "{\"job\":{\"created_at\":\"0001-01-01T00:00:00Z\",\"enqueued_at\":\"0001-01-01T00:00:00Z\",\"id\":\"xxx\",\"last_error\":\"\",\"payload\":null,\"retries\":0,\"updated_at\":\"0001-01-01T00:00:00Z\"},\"namespace\":\"{ns1}\",\"status\":\"completed\"}\n",
 		},
 		{
 			// bad duration
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
 			reqBody: `{
-				"payload": "payload1",
 				"delay": 1
 			}`,
-			respCode: 500,
-			respBody: "{\"error\":\"invalid duration: 1\"}\n",
+			respCode: 400,
+			respBody: "{\"error\":\"can't decode JSON body: invalid duration: 1\"}\n",
 		},
 		{
 			// bad payload
 			reqMethod: "POST",
 			reqURL:    "http://example.com/jobs",
 			reqBody:   `{`,
-			respCode:  500,
-			respBody:  "{\"error\":\"unexpected EOF\"}\n",
+			respCode:  400,
+			respBody:  "{\"error\":\"can't decode JSON body: unexpected EOF\"}\n",
 		},
 		{
 			reqMethod: "POST",
@@ -124,17 +123,17 @@ func TestServer(t *testing.T) {
 			reqBody: `{
 				"namespace": "{ns1}",
 				"queue_id": "q1",
-				"payload": "payload1",
+				"payload": "InBheWxvYWQxIg==",
 				"delay": "10s"
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:.+-]+\",\"enqueued_at\":\"[TZ0-9:.+-]+\",\"id\":\"[a-z0-9-]{36}\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:.+-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":0,\"scheduled_total\":1,\"total\":1,\"latency\":0}\n",
+			respBody:  "{\"latency\":0,\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":0,\"scheduled_total\":1,\"total\":1}\n",
 		},
 		{
 			reqMethod: "POST",
@@ -142,16 +141,16 @@ func TestServer(t *testing.T) {
 			reqBody: `{
 				"namespace": "{ns1}",
 				"queue_id": "q1",
-				"payload": "payload1"
+				"payload": "InBheWxvYWQxIg=="
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"[a-z0-9-]{36}\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:.+-]+\",\"enqueued_at\":\"[TZ0-9:.+-]+\",\"id\":\"[a-z0-9-]{36}\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:.+-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2,\"latency\":[0-9]+}\n",
+			respBody:  "{\"latency\":[0-9]+,\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2}\n",
 		},
 		{
 			reqMethod: "POST",
@@ -160,10 +159,10 @@ func TestServer(t *testing.T) {
 				"namespace": "{ns1}",
 				"queue_id": "q1",
 				"id": "id1",
-				"payload": "payload1"
+				"payload": "InBheWxvYWQxIg=="
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:.+-]+\",\"enqueued_at\":\"[TZ0-9:.+-]+\",\"id\":\"id1\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:.+-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			// same job id
@@ -173,40 +172,120 @@ func TestServer(t *testing.T) {
 				"namespace": "{ns1}",
 				"queue_id": "q1",
 				"id": "id1",
-				"payload": "payload2"
+				"payload": "InBheWxvYWQyIg=="
 			}`,
 			respCode: 200,
-			respBody: "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:.+-]+\",\"enqueued_at\":\"[TZ0-9:.+-]+\",\"id\":\"id1\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:.+-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":2,\"scheduled_total\":1,\"total\":3,\"latency\":[0-9]+}\n",
+			respBody:  "{\"latency\":[0-9]+,\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":2,\"scheduled_total\":1,\"total\":3}\n",
 		},
 		{
 			reqMethod: "GET",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"status\":\"ready\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody:  "{\"job\":{\"created_at\":\"[TZ0-9:.+-]+\",\"enqueued_at\":\"[TZ0-9:.+-]+\",\"id\":\"id1\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:.+-]+\"},\"namespace\":\"{ns1}\",\"status\":\"ready\"}",
 		},
 		{
+			// missing required query parameter
 			reqMethod: "DELETE",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=id1",
-			respCode:  500,
-			respBody:  "{\"error\":\"work: empty queue id\"}\n",
+			respCode:  400,
+			respBody:  "{\"error\":\"Query argument queue_id is required, but not found\"}\n",
 		},
 		{
 			reqMethod: "DELETE",
 			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=id1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"job\":{\"ID\":\"id1\",\"CreatedAt\":\"[TZ0-9:-]+\",\"UpdatedAt\":\"[TZ0-9:-]+\",\"EnqueuedAt\":\"[TZ0-9:-]+\",\"Payload\":\"InBheWxvYWQxIg==\",\"Retries\":0,\"LastError\":\"\"}}",
+			respBody:  "{\"job\":{\"created_at\":\"[TZ0-9:.+-]+\",\"enqueued_at\":\"[TZ0-9:.+-]+\",\"id\":\"id1\",\"last_error\":\"\",\"payload\":\"InBheWxvYWQxIg==\",\"retries\":0,\"updated_at\":\"[TZ0-9:.+-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 		{
 			reqMethod: "GET",
 			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
 			respCode:  200,
-			respBody:  "{\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2,\"latency\":[0-9]+}\n",
+			respBody:  "{\"latency\":[0-9]+,\"namespace\":\"{ns1}\",\"queue_id\":\"q1\",\"ready_total\":1,\"scheduled_total\":1,\"total\":2}\n",
+		},
+		{
+			// payload is symmetric base64: the exact bytes sent come back
+			// unchanged. eyJhIjoxfQ== is base64 for {"a":1}.
+			reqMethod: "POST",
+			reqURL:    "http://example.com/jobs",
+			reqBody: `{
+				"namespace": "{ns1}",
+				"queue_id": "q1",
+				"payload": "eyJhIjoxfQ=="
+			}`,
+			respCode: 200,
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:.+-]+\",\"enqueued_at\":\"[TZ0-9:.+-]+\",\"id\":\"[a-z0-9-]{36}\",\"last_error\":\"\",\"payload\":\"eyJhIjoxfQ==\",\"retries\":0,\"updated_at\":\"[TZ0-9:.+-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
+		},
+	} {
+		var reqBody io.Reader
+		if test.reqBody != "" {
+			reqBody = strings.NewReader(test.reqBody)
+		}
+		req := httptest.NewRequest(test.reqMethod, test.reqURL, reqBody)
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, req)
+		require.Regexp(t, fmt.Sprintf("^%s\n?$", test.respBody), w.Body.String())
+		require.Equal(t, test.respCode, w.Code)
+	}
+}
+
+// bareQueue implements work.Queue but neither BulkJobFinder nor
+// MetricsExporter, so capability-gated operations must report 404 while enqueue
+// still works.
+type bareQueue struct{}
+
+func (bareQueue) Enqueue(*work.Job, *work.EnqueueOptions) error   { return nil }
+func (bareQueue) Dequeue(*work.DequeueOptions) (*work.Job, error) { return nil, work.ErrEmptyQueue }
+func (bareQueue) Ack(*work.Job, *work.AckOptions) error           { return nil }
+
+func TestServerNotSupported(t *testing.T) {
+	srv := NewServer(&ServerOptions{Queue: bareQueue{}})
+
+	for _, test := range []struct {
+		reqMethod string
+		reqURL    string
+		reqBody   string
+		respCode  int
+		respBody  string
+	}{
+		{
+			// getJob needs BulkJobFinder
+			reqMethod: "GET",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&job_id=x",
+			respCode:  404,
+			respBody:  "",
+		},
+		{
+			// deleteJob needs BulkJobFinder
+			reqMethod: "DELETE",
+			reqURL:    "http://example.com/jobs?namespace=%7Bns1%7D&queue_id=q1&job_id=x",
+			respCode:  404,
+			respBody:  "",
+		},
+		{
+			// getMetrics needs MetricsExporter
+			reqMethod: "GET",
+			reqURL:    "http://example.com/metrics?namespace=%7Bns1%7D&queue_id=q1",
+			respCode:  404,
+			respBody:  "",
+		},
+		{
+			// enqueue needs no extra capability; the dedup check is skipped when
+			// the queue is not a BulkJobFinder, so create still succeeds
+			reqMethod: "POST",
+			reqURL:    "http://example.com/jobs",
+			reqBody: `{
+				"namespace": "{ns1}",
+				"queue_id": "q1",
+				"id": "x"
+			}`,
+			respCode: 200,
+			respBody: "{\"job\":{\"created_at\":\"[TZ0-9:.+-]+\",\"enqueued_at\":\"[TZ0-9:.+-]+\",\"id\":\"x\",\"last_error\":\"\",\"payload\":null,\"retries\":0,\"updated_at\":\"[TZ0-9:.+-]+\"},\"namespace\":\"{ns1}\",\"queue_id\":\"q1\"}",
 		},
 	} {
 		var reqBody io.Reader
@@ -222,7 +301,7 @@ func TestServer(t *testing.T) {
 }
 
 func TestJobStatus(t *testing.T) {
-	require.Equal(t, "completed", jobStatus(&work.Job{}))
-	require.Equal(t, "ready", jobStatus(work.NewJob()))
-	require.Equal(t, "scheduled", jobStatus(work.NewJob().Delay(10*time.Second)))
+	require.Equal(t, Completed, jobStatus(&work.Job{}))
+	require.Equal(t, Ready, jobStatus(work.NewJob()))
+	require.Equal(t, Scheduled, jobStatus(work.NewJob().Delay(10*time.Second)))
 }
