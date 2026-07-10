@@ -49,8 +49,8 @@ type CreateJobRequest struct {
 	// Namespace Queue namespace.
 	Namespace string `json:"namespace"`
 
-	// Payload Arbitrary JSON payload to attach to the job.
-	Payload json.RawMessage `json:"payload,omitempty"`
+	// Payload Opaque job payload as base64-encoded bytes.
+	Payload []byte `json:"payload,omitempty"`
 
 	// QueueID Queue id within the namespace.
 	QueueID string `json:"queue_id"`
@@ -75,7 +75,7 @@ type Job struct {
 	// LastError Error string from the most recent failure, if any.
 	LastError string `json:"last_error"`
 
-	// Payload Raw job payload, base64-encoded on output; null when empty.
+	// Payload Opaque job payload as base64-encoded bytes; null when empty.
 	Payload *[]byte `json:"payload"`
 
 	// Retries Number of times the job has failed and been retried.

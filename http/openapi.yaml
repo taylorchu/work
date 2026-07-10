@@ -195,7 +195,7 @@ components:
           type: string
           format: byte
           nullable: true
-          description: Raw job payload, base64-encoded on output; null when empty.
+          description: Opaque job payload as base64-encoded bytes; null when empty.
         retries:
           type: integer
           format: int64
@@ -233,11 +233,13 @@ components:
             Optional job id. If set and already present, the existing job is
             returned instead of enqueuing a duplicate.
         payload:
-          # Arbitrary JSON, kept as raw bytes. oapi-codegen auto-imports
-          # encoding/json for this well-known type.
-          x-go-type: json.RawMessage
+          # Opaque bytes, base64-encoded on the wire in both directions so a
+          # payload round-trips exactly regardless of content (it need not be
+          # JSON). Mirrors Job.payload.
+          type: string
+          format: byte
           x-go-type-skip-optional-pointer: true
-          description: Arbitrary JSON payload to attach to the job.
+          description: Opaque job payload as base64-encoded bytes.
         delay:
           # Mapped to the package-local duration type, which (un)marshals a Go
           # duration string such as "10s".
